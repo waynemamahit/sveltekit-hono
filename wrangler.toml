@@ -1,0 +1,22 @@
+name = "sveltekit-hono-worker"
+main = "./.svelte-kit/output/server/index.js"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = ".svelte-kit/cloudflare"
+
+# Assets configuration for SvelteKit
+[assets]
+directory = ".svelte-kit/cloudflare"
+binding = "ASSETS"
+
+# Development configuration
+[dev]
+port = 8787
+local_protocol = "https"
+
+# Environment variables (add your own here)
+[vars]
+ENVIRONMENT = "development"
+
+# Production environment variables
+[env.production.vars]
+ENVIRONMENT = "production"
