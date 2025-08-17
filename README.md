@@ -7,6 +7,7 @@ A modern, full-stack web application template combining the power of **SvelteKit
 [![Hono](https://img.shields.io/badge/Hono-FF6900?style=for-the-badge&logo=hono&logoColor=white)](https://hono.dev/)
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-F38020?style=for-the-badge&logo=Cloudflare&logoColor=white)](https://workers.cloudflare.com/)
 [![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
 
 ## ✨ Features
 
@@ -15,6 +16,7 @@ A modern, full-stack web application template combining the power of **SvelteKit
 - 🛠️ **Type-Safe API** - Hono with full TypeScript support and validation
 - 🎨 **Modern UI** - TailwindCSS for beautiful, responsive design
 - 🔧 **Developer Experience** - Hot reload, TypeScript, ESLint, Prettier
+- 🧪 **Comprehensive Testing** - Vitest with API and component testing setup
 - 🚀 **Production Ready** - Optimized builds and edge-side caching
 - 🔒 **Environment Management** - Secure variable handling for all environments
 - 📊 **Built-in Monitoring** - Health checks and request logging
@@ -24,6 +26,7 @@ A modern, full-stack web application template combining the power of **SvelteKit
 - **Frontend**: [SvelteKit](https://kit.svelte.dev/) + [Svelte 5](https://svelte.dev/)
 - **Backend**: [Hono](https://hono.dev/) API framework
 - **Styling**: [TailwindCSS](https://tailwindcss.com/)
+- **Testing**: [Vitest](https://vitest.dev/) + [Testing Library](https://testing-library.com/)
 - **Platform**: [Cloudflare Workers](https://workers.cloudflare.com/) + [Pages](https://pages.cloudflare.com/)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
 - **Package Manager**: [pnpm](https://pnpm.io/)
@@ -70,18 +73,22 @@ A modern, full-stack web application template combining the power of **SvelteKit
 
 ### Available Scripts
 
-| Command           | Description                                 |
-| ----------------- | ------------------------------------------- |
-| `pnpm dev`        | Start SvelteKit development server          |
-| `pnpm dev:cf`     | Start Cloudflare Workers development server |
-| `pnpm build`      | Build for production                        |
-| `pnpm preview`    | Preview production build locally            |
-| `pnpm preview:cf` | Preview with Cloudflare Workers simulation  |
-| `pnpm deploy`     | Deploy to Cloudflare Workers                |
-| `pnpm deploy:cf`  | Deploy to Cloudflare production environment |
-| `pnpm check`      | Run TypeScript and Svelte checks            |
-| `pnpm lint`       | Lint code with ESLint and Prettier          |
-| `pnpm format`     | Format code with Prettier                   |
+| Command              | Description                                 |
+| -------------------- | ------------------------------------------- |
+| `pnpm dev`           | Start SvelteKit development server          |
+| `pnpm dev:cf`        | Start Cloudflare Workers development server |
+| `pnpm build`         | Build for production                        |
+| `pnpm preview`       | Preview production build locally            |
+| `pnpm preview:cf`    | Preview with Cloudflare Workers simulation  |
+| `pnpm test`          | Run tests in watch mode                     |
+| `pnpm test:run`      | Run all tests once                          |
+| `pnpm test:ui`       | Run tests with interactive UI               |
+| `pnpm test:coverage` | Run tests with coverage report              |
+| `pnpm deploy`        | Deploy to Cloudflare Workers                |
+| `pnpm deploy:cf`     | Deploy to Cloudflare production environment |
+| `pnpm check`         | Run TypeScript and Svelte checks            |
+| `pnpm lint`          | Lint code with ESLint and Prettier          |
+| `pnpm format`        | Format code with Prettier                   |
 
 ### Development Workflows
 
@@ -125,6 +132,65 @@ const newUser = await fetch('/api/users', {
 });
 ```
 
+## 🧪 Testing
+
+This project includes comprehensive testing for both API endpoints and Svelte components.
+
+### Running Tests
+
+```bash
+# Run all tests
+pnpm test:run
+
+# Run tests in watch mode during development
+pnpm test
+
+# Run tests with interactive UI
+pnpm test:ui
+
+# Generate coverage report
+pnpm test:coverage
+```
+
+### Test Structure
+
+- **API Tests** - Test Hono endpoints with request/response validation
+- **Component Tests** - Test Svelte components with user interactions
+- **Integration Tests** - End-to-end functionality testing
+
+```bash
+# Run specific test types
+pnpm test:run src/tests/api/        # API tests only
+pnpm test:run src/tests/components/ # Component tests only
+```
+
+### Example Tests
+
+**API Testing:**
+
+```typescript
+it('should return health status', async () => {
+	const request = new Request('http://localhost/api/health');
+	const response = await GET({ request } as RequestEvent);
+
+	expect(response.status).toBe(200);
+	const data = await response.json();
+	expect(data).toHaveProperty('status', 'ok');
+});
+```
+
+**Component Testing:**
+
+```typescript
+it('should render and handle events', async () => {
+	const onClick = vi.fn();
+	const { getByTestId } = render(MyComponent, { onClick });
+
+	await fireEvent.click(getByTestId('button'));
+	expect(onClick).toHaveBeenCalled();
+});
+```
+
 ## 📁 Project Structure
 
 ```
@@ -141,12 +207,21 @@ const newUser = await fetch('/api/users', {
 │   │   └── user.model.ts         # TypeScript models
 │   ├── types/
 │   │   └── health.ts             # Type definitions
+│   ├── tests/
+│   │   ├── setup.ts              # Test configuration
+│   │   ├── utils.ts              # Test utilities
+│   │   ├── api/
+│   │   │   ├── server.test.ts    # API endpoint tests
+│   │   │   └── hono-advanced.test.ts # Advanced API tests
+│   │   └── components/
+│   │       ├── UserCard.test.ts  # Component tests
+│   │       └── UserForm.test.ts  # Form validation tests
 │   ├── app.html                  # HTML template
 │   └── app.css                   # Global styles
 ├── static/                       # Static assets
 ├── wrangler.toml                 # Cloudflare Workers config
 ├── svelte.config.js              # SvelteKit configuration
-├── vite.config.ts                # Vite configuration
+├── vite.config.ts                # Vite + testing configuration
 └── DEVELOPMENT.md                # Detailed development guide
 ```
 
@@ -211,16 +286,23 @@ The application is optimized for Cloudflare Workers with:
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Make your changes and add tests if applicable
+4. Run the test suite: `pnpm test:run`
+5. Ensure code quality: `pnpm lint` and `pnpm check`
+6. Commit your changes (`git commit -m 'Add some amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+Please ensure all tests pass and maintain good test coverage for new features.
 
 ## 📚 Documentation
 
-- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Comprehensive development guide
+- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Comprehensive development guide with testing
 - **[SvelteKit Docs](https://kit.svelte.dev/)** - SvelteKit documentation
 - **[Hono Docs](https://hono.dev/)** - Hono API framework docs
 - **[Cloudflare Workers Docs](https://developers.cloudflare.com/workers/)** - Deployment platform docs
+- **[Vitest Docs](https://vitest.dev/)** - Testing framework documentation
+- **[Testing Library](https://testing-library.com/docs/svelte-testing-library/intro/)** - Component testing utilities
 
 ## 🐛 Troubleshooting
 
@@ -240,6 +322,13 @@ The application is optimized for Cloudflare Workers with:
 
 - Run `pnpm check` for TypeScript validation
 - Check all imports and dependencies
+
+**Test failures?**
+
+- Run `pnpm test:ui` for interactive debugging
+- Verify component imports and `data-testid` attributes
+- Check mock configurations in `src/tests/setup.ts`
+- Use `screen.debug()` to inspect DOM state
 
 For more troubleshooting tips, see [DEVELOPMENT.md](./DEVELOPMENT.md).
 

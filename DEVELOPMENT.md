@@ -81,6 +81,257 @@ The Hono API is located in `src/routes/api/[...paths]/+server.ts` and includes:
    - Cloudflare Workers environment
    - Configure in `wrangler.toml`
 
+## 🧪 Testing
+
+This project includes comprehensive testing for both Hono API endpoints and Svelte components using Vitest and Testing Library.
+
+### Running Tests
+
+```bash
+# Run all tests
+pnpm test:run
+
+# Run tests in watch mode
+pnpm test
+
+# Run tests with UI
+pnpm test:ui
+
+# Run tests with coverage report
+pnpm test:coverage
+
+# Run specific test files
+pnpm test:run src/tests/components/
+pnpm test:run src/tests/api/
+```
+
+### Test Structure
+
+```
+src/tests/
+├── setup.ts              # Global test setup
+├── utils.ts               # Test utilities and mocks
+├── api/
+│   ├── server.test.ts     # Basic API endpoint tests
+│   └── hono-advanced.test.ts  # Advanced API testing patterns
+└── components/
+    ├── UserCard.test.ts   # Component testing example
+    └── UserForm.test.ts   # Form testing with validation
+```
+
+### API Testing (Hono)
+
+The API tests cover all CRUD operations and advanced scenarios:
+
+```typescript
+// Basic API test example
+import { describe, expect, it } from 'vitest';
+import { GET } from '../../routes/api/[...paths]/+server';
+
+describe('API Endpoints', () => {
+	it('should return health status', async () => {
+		const request = new Request('http://localhost/api/health');
+		const response = await GET({ request } as RequestEvent);
+
+		expect(response.status).toBe(200);
+
+		const data = await response.json();
+		expect(data).toHaveProperty('status', 'ok');
+		expect(data).toHaveProperty('timestamp');
+	});
+});
+```
+
+**What's Tested:**
+
+- ✅ GET/POST/PUT/DELETE operations
+- ✅ Request/response validation
+- ✅ Error handling
+- ✅ Headers and CORS
+- ✅ Query parameters and URL params
+- ✅ JSON parsing and malformed data
+- ✅ Concurrent requests and performance
+
+### Component Testing (Svelte)
+
+Svelte components are tested using `@testing-library/svelte`:
+
+```typescript
+// Component test example
+import { fireEvent } from '@testing-library/dom';
+import { render } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
+import MyComponent from '../../lib/components/MyComponent.svelte';
+
+describe('MyComponent', () => {
+	it('should render and handle click events', async () => {
+		const onClick = vi.fn();
+		const { getByTestId } = render(MyComponent, {
+			title: 'Test Title',
+			onClick
+		});
+
+		expect(getByTestId('title')).toHaveTextContent('Test Title');
+
+		await fireEvent.click(getByTestId('button'));
+		expect(onClick).toHaveBeenCalledOnce();
+	});
+});
+```
+
+**What's Tested:**
+
+- ✅ Props rendering
+- ✅ Event handling (clicks, form submissions)
+- ✅ Form validation and error states
+- ✅ Conditional rendering
+- ✅ User interactions
+- ✅ Component state changes
+
+### Testing Utilities
+
+The `src/tests/utils.ts` provides helpful utilities:
+
+```typescript
+// Mock API responses
+import { MockAPI } from '../tests/utils';
+
+MockAPI.mockSuccess({ users: [] });
+MockAPI.mockError('Server error', 500);
+MockAPI.reset(); // Clear all mocks
+```
+
+### Configuration
+
+**Vite Config** (`vite.config.ts`):
+
+```typescript
+export default defineConfig(() => ({
+	plugins: [tailwindcss(), sveltekit(), svelteTesting()], // ← Key plugin
+	test: {
+		include: ['src/**/*.{test,spec}.{js,ts}'],
+		exclude: ['src/routes/**/*'], // Exclude route files
+		environment: 'jsdom',
+		setupFiles: ['./src/tests/setup.ts'],
+		globals: true,
+		coverage: {
+			reporter: ['text', 'json', 'html'],
+			exclude: ['node_modules/', 'src/routes/**/*']
+		}
+	}
+}));
+```
+
+**Setup File** (`src/tests/setup.ts`):
+
+```typescript
+import '@testing-library/jest-dom/vitest';
+import { beforeEach, vi } from 'vitest';
+
+// Mock fetch globally for API tests
+global.fetch = vi.fn();
+
+// Global test setup
+beforeEach(() => {
+	vi.clearAllMocks();
+});
+```
+
+### Best Practices
+
+1. **Use data-testid attributes** for reliable element selection:
+
+   ```svelte
+   <button data-testid="submit-button">Submit</button>
+   ```
+
+2. **Test user behavior, not implementation**:
+
+   ```typescript
+   // Good: Test what user sees/does
+   expect(getByText('Welcome')).toBeInTheDocument();
+   await fireEvent.click(getByTestId('login-button'));
+
+   // Avoid: Testing internal state directly
+   ```
+
+3. **Mock external dependencies**:
+
+   ```typescript
+   // Mock API calls
+   MockAPI.mockSuccess({ data: 'test' });
+
+   // Mock functions
+   const onClick = vi.fn();
+   ```
+
+4. **Use descriptive test names**:
+
+   ```typescript
+   it('should display error message when email is invalid');
+   it('should call onSubmit with form data when form is valid');
+   ```
+
+5. **Wait for async operations**:
+   ```typescript
+   await fireEvent.click(button);
+   await tick(); // For Svelte reactivity
+   ```
+
+### Coverage Reports
+
+After running `pnpm test:coverage`, view the coverage report:
+
+- **Terminal**: Immediate summary in console
+- **HTML Report**: Open `coverage/index.html` in browser
+- **JSON Report**: `coverage/coverage-final.json` for CI/CD
+
+**Coverage Targets:**
+
+- Statements: > 80%
+- Branches: > 80%
+- Functions: > 80%
+- Lines: > 80%
+
+### Debugging Tests
+
+1. **Use `screen.debug()`** to inspect DOM:
+
+   ```typescript
+   import { screen } from '@testing-library/dom';
+   screen.debug(); // Logs current DOM state
+   ```
+
+2. **Check mock calls**:
+
+   ```typescript
+   console.log(mockFunction.mock.calls);
+   ```
+
+3. **Run single test file**:
+
+   ```bash
+   pnpm test:run src/tests/components/MyComponent.test.ts
+   ```
+
+4. **Use Vitest UI** for interactive debugging:
+   ```bash
+   pnpm test:ui
+   ```
+
+### Continuous Integration
+
+Tests are designed to run in CI environments:
+
+```yaml
+# Example GitHub Actions step
+- name: Run tests
+  run: pnpm test:run
+
+- name: Run tests with coverage
+  run: pnpm test:coverage
+```
+
 ## 📦 Building and Deployment
 
 ### Local Preview
@@ -154,17 +405,24 @@ Configuration:
 
 ## 🛠️ Available Scripts
 
-| Command                  | Description                              |
-| ------------------------ | ---------------------------------------- |
-| `pnpm dev`               | Start SvelteKit dev server               |
-| `pnpm dev:wrangler`      | Start Wrangler dev server                |
-| `pnpm build`             | Build for production                     |
-| `pnpm preview`           | Preview built app locally                |
-| `pnpm preview:wrangler`  | Preview with Wrangler                    |
-| `pnpm deploy`            | Deploy to Cloudflare                     |
-| `pnpm deploy:production` | Deploy to production environment         |
-| `pnpm cf:dev`            | Build and run with Cloudflare simulation |
-| `pnpm cf:build`          | Test build for Cloudflare (dry run)      |
+| Command              | Description                              |
+| -------------------- | ---------------------------------------- |
+| `pnpm dev`           | Start SvelteKit dev server               |
+| `pnpm dev:cf`        | Start Wrangler dev server                |
+| `pnpm build`         | Build for production                     |
+| `pnpm preview`       | Preview built app locally                |
+| `pnpm preview:cf`    | Preview with Wrangler                    |
+| `pnpm test`          | Run tests in watch mode                  |
+| `pnpm test:run`      | Run all tests once                       |
+| `pnpm test:ui`       | Run tests with interactive UI            |
+| `pnpm test:coverage` | Run tests with coverage report           |
+| `pnpm deploy`        | Deploy to Cloudflare                     |
+| `pnpm deploy:cf`     | Deploy to production environment         |
+| `pnpm cf:dev`        | Build and run with Cloudflare simulation |
+| `pnpm cf:build`      | Test build for Cloudflare (dry run)      |
+| `pnpm check`         | Run TypeScript type checking             |
+| `pnpm lint`          | Run ESLint and Prettier checks           |
+| `pnpm format`        | Format code with Prettier                |
 
 ## 🔍 Debugging
 
@@ -183,6 +441,12 @@ Configuration:
    - Ensure all imports are correct
    - Run `pnpm check` for type checking
 
+4. **Test failures:**
+   - Run `pnpm test:ui` for interactive debugging
+   - Check mock configurations in `src/tests/setup.ts`
+   - Verify component imports and data-testid attributes
+   - Use `screen.debug()` to inspect DOM state
+
 ### Development Tips
 
 1. **Use standard SvelteKit dev** for most development
@@ -196,3 +460,6 @@ Configuration:
 - [Hono Documentation](https://hono.dev/)
 - [Cloudflare Workers Documentation](https://developers.cloudflare.com/workers/)
 - [Wrangler CLI Documentation](https://developers.cloudflare.com/workers/wrangler/)
+- [Vitest Documentation](https://vitest.dev/)
+- [Testing Library Svelte](https://testing-library.com/docs/svelte-testing-library/intro/)
+- [Testing Library DOM](https://testing-library.com/docs/dom-testing-library/intro/)

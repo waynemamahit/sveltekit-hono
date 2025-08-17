@@ -1,14 +1,15 @@
 <script lang="ts">
-	import { PUBLIC_ENV } from '$lib/env';
+	import { PUBLIC_ENV } from '../lib/env';
 	import { onMount } from 'svelte';
 	import type { User } from '../models/user.model';
 	import type { HealthStatus } from '../types/health';
+	import UserCard from '../ui/components/UserCard.svelte';
+	import UserForm from '../ui/components/UserForm.svelte';
 
 	let message = $state('');
 	let response = $state({});
 	let users = $state<User[]>([]);
 	let healthStatus = $state<HealthStatus | null>(null);
-	let newUser = $state({ name: '', email: '' });
 	let isLoading = $state(false);
 
 	onMount(() => {
@@ -49,10 +50,7 @@
 		}
 	};
 
-	const createUser = async (event?: Event) => {
-		event?.preventDefault();
-		if (!newUser.name || !newUser.email) return;
-
+	const createUser = async (userData: { name: string; email: string }) => {
 		isLoading = true;
 		try {
 			const res = await fetch(`${PUBLIC_ENV.API_BASE_URL}/users`, {
@@ -60,16 +58,16 @@
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify(newUser)
+				body: JSON.stringify(userData)
 			});
 			const json = await res.json();
 
 			if (res.ok) {
 				users = [...users, json.user];
-				newUser = { name: '', email: '' };
 			}
 		} catch (error) {
 			console.error('Error creating user:', error);
+			throw error; // Re-throw so UserForm can handle the error
 		} finally {
 			isLoading = false;
 		}
@@ -139,55 +137,21 @@
 				<!-- Add User Form -->
 				<div class="mb-6 rounded-lg border bg-white p-6 shadow-sm">
 					<h3 class="mb-4 text-lg font-semibold">Add New User</h3>
-					<form onsubmit={createUser} class="flex flex-col gap-4 sm:flex-row">
-						<input
-							bind:value={newUser.name}
-							placeholder="Name"
-							required
-							class="flex-1 rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-						/>
-						<input
-							bind:value={newUser.email}
-							type="email"
-							placeholder="Email"
-							required
-							class="flex-1 rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-						/>
-						<button
-							type="submit"
-							disabled={isLoading}
-							class="rounded-md bg-blue-600 px-6 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-						>
-							{isLoading ? 'Adding...' : 'Add User'}
-						</button>
-					</form>
+					<UserForm onSubmit={createUser} {isLoading} />
 				</div>
 
 				<!-- Users List -->
-				<div class="rounded-lg border bg-white shadow-sm">
-					<div class="border-b p-4">
+				<div class="space-y-4">
+					<div class="rounded-lg border bg-white p-4 shadow-sm">
 						<h3 class="text-lg font-semibold">Users ({users.length})</h3>
 					</div>
-					<div class="divide-y">
-						{#each users as user (user.id)}
-							<div class="flex items-center justify-between p-4">
-								<div>
-									<p class="font-medium">{user.name}</p>
-									<p class="text-sm text-gray-600">{user.email}</p>
-								</div>
-								<button
-									onclick={() => deleteUser(user.id)}
-									class="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 transition-colors hover:bg-red-200"
-								>
-									Delete
-								</button>
-							</div>
-						{:else}
-							<div class="p-8 text-center text-gray-500">
-								No users found. Add some users to get started!
-							</div>
-						{/each}
-					</div>
+					{#each users as user (user.id)}
+						<UserCard {user} onDelete={deleteUser} />
+					{:else}
+						<div class="rounded-lg border bg-white p-8 text-center text-gray-500 shadow-sm">
+							No users found. Add some users to get started!
+						</div>
+					{/each}
 				</div>
 			</div>
 

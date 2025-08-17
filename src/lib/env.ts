@@ -6,7 +6,7 @@ import { dev } from '$app/environment';
  */
 
 // Client-side environment variables (prefixed with PUBLIC_)
-export const PUBLIC_ENV = {
+export const PUBLIC_ENV: Readonly<ClientEnv> = {
 	API_BASE_URL: dev ? 'http://localhost:5173/api' : '/api',
 	ENVIRONMENT: dev ? 'development' : 'production'
 } as const;
