@@ -47,7 +47,7 @@ describe('Health Types', () => {
 
 	describe('HealthStatus validation helpers', () => {
 		// Helper functions for health status validation
-		const isValidHealthStatus = (health: any): health is HealthStatus => {
+		const isValidHealthStatus = (health: HealthStatus): health is HealthStatus => {
 			return (
 				typeof health === 'object' &&
 				health !== null &&
@@ -99,7 +99,7 @@ describe('Health Types', () => {
 			];
 
 			invalidHealthStatuses.forEach((health) => {
-				expect(isValidHealthStatus(health)).toBe(false);
+				expect(isValidHealthStatus(health as HealthStatus)).toBe(false);
 			});
 		});
 
