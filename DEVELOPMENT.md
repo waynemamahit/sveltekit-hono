@@ -408,8 +408,9 @@ Configuration:
 | Command              | Description                              |
 | -------------------- | ---------------------------------------- |
 | `pnpm dev`           | Start SvelteKit dev server               |
-| `pnpm dev:cf`        | Start Wrangler dev server                |
+| `pnpm dev:cf`        | Build and run Wrangler dev server        |
 | `pnpm build`         | Build for production                     |
+| `pnpm build:cf`      | Test build for Cloudflare (dry run)      |
 | `pnpm preview`       | Preview built app locally                |
 | `pnpm preview:cf`    | Preview with Wrangler                    |
 | `pnpm test`          | Run tests in watch mode                  |
@@ -418,8 +419,6 @@ Configuration:
 | `pnpm test:coverage` | Run tests with coverage report           |
 | `pnpm deploy`        | Deploy to Cloudflare                     |
 | `pnpm deploy:cf`     | Deploy to production environment         |
-| `pnpm cf:dev`        | Build and run with Cloudflare simulation |
-| `pnpm cf:build`      | Test build for Cloudflare (dry run)      |
 | `pnpm check`         | Run TypeScript type checking             |
 | `pnpm lint`          | Run ESLint and Prettier checks           |
 | `pnpm format`        | Format code with Prettier                |
