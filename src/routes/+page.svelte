@@ -44,7 +44,7 @@
 		try {
 			const res = await fetch(`${PUBLIC_ENV.API_BASE_URL}/users`);
 			const json = await res.json();
-			users = json.users;
+			users = json.data || [];
 		} catch (error) {
 			console.error('Error fetching users:', error);
 		}
@@ -63,7 +63,7 @@
 			const json = await res.json();
 
 			if (res.ok) {
-				users = [...users, json.user];
+				users = [...users, json.data];
 			}
 		} catch (error) {
 			console.error('Error creating user:', error);

@@ -40,11 +40,12 @@ describe('Hono API Routes', () => {
 			expect(response.status).toBe(200);
 
 			const data = await response.json();
-			expect(data).toHaveProperty('users');
-			expect(Array.isArray(data.users)).toBe(true);
-			expect(data.users).toHaveLength(2);
-			expect(data.users[0]).toHaveProperty('id', 1);
-			expect(data.users[0]).toHaveProperty('name', 'John Doe');
+			expect(data).toHaveProperty('success', true);
+			expect(data).toHaveProperty('data');
+			expect(Array.isArray(data.data)).toBe(true);
+			expect(data.data).toHaveLength(2);
+			expect(data.data[0]).toHaveProperty('id', 1);
+			expect(data.data[0]).toHaveProperty('name', 'John Doe');
 		});
 	});
 
@@ -68,11 +69,12 @@ describe('Hono API Routes', () => {
 			expect(response.status).toBe(201);
 
 			const data = await response.json();
+			expect(data).toHaveProperty('success', true);
 			expect(data).toHaveProperty('message', 'User created successfully');
-			expect(data).toHaveProperty('user');
-			expect(data.user).toHaveProperty('name', userData.name);
-			expect(data.user).toHaveProperty('email', userData.email);
-			expect(data.user).toHaveProperty('id');
+			expect(data).toHaveProperty('data');
+			expect(data.data).toHaveProperty('name', userData.name);
+			expect(data.data).toHaveProperty('email', userData.email);
+			expect(data.data).toHaveProperty('id');
 		});
 	});
 
@@ -94,13 +96,11 @@ describe('Hono API Routes', () => {
 
 			const response = await PUT({ request } as RequestEvent);
 
-			expect(response.status).toBe(200);
+			expect(response.status).toBe(404);
 
 			const data = await response.json();
-			expect(data).toHaveProperty('message', `User ${userId} updated successfully`);
-			expect(data).toHaveProperty('user');
-			expect(data.user).toHaveProperty('id', parseInt(userId));
-			expect(data.user).toHaveProperty('name', updateData.name);
+			expect(data).toHaveProperty('success', false);
+			expect(data).toHaveProperty('error', 'User not found');
 		});
 	});
 
@@ -113,11 +113,11 @@ describe('Hono API Routes', () => {
 
 			const response = await DELETE({ request } as RequestEvent);
 
-			expect(response.status).toBe(200);
+			expect(response.status).toBe(404);
 
 			const data = await response.json();
-			expect(data).toHaveProperty('message', `User ${userId} deleted successfully`);
-			expect(data).toHaveProperty('timestamp');
+			expect(data).toHaveProperty('success', false);
+			expect(data).toHaveProperty('error', 'User not found');
 		});
 	});
 

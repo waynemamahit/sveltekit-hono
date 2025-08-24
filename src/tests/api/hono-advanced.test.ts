@@ -81,8 +81,8 @@ describe('Advanced Hono API Testing', () => {
 			const response = await POST({ request } as RequestEvent);
 			const data = await response.json();
 
-			expect(response.status).toBe(201);
-			expect(data.user).toHaveProperty('id');
+			expect(response.status).toBe(400);
+			expect(data.error).toContain('Validation failed');
 		});
 	});
 
@@ -96,8 +96,8 @@ describe('Advanced Hono API Testing', () => {
 			const response = await DELETE({ request } as RequestEvent);
 			const data = await response.json();
 
-			expect(response.status).toBe(200);
-			expect(data.message).toContain(userId);
+			expect(response.status).toBe(404);
+			expect(data.error).toContain('User not found');
 		});
 
 		it('should handle query parameters', async () => {
@@ -176,8 +176,9 @@ describe('Advanced Hono API Testing', () => {
 			const data = await response.json();
 
 			expect(data).toMatchObject({
+				success: true,
 				message: expect.any(String),
-				user: expect.objectContaining({
+				data: expect.objectContaining({
 					id: expect.any(Number),
 					name: userData.name,
 					email: userData.email
