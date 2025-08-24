@@ -9,6 +9,7 @@ import type {
 } from '../interfaces/user.interface';
 import type { ILogger } from '../interfaces/logger.interface';
 import { TYPES } from '../container/types';
+import { ValidationError } from '../types/errors';
 
 // Dependency Inversion Principle - Depends on abstractions, not concretions
 @injectable()
@@ -42,8 +43,8 @@ export class UserService implements IUserService {
 		// Validation
 		const validation = this.validationService.validateCreateUser(userData);
 		if (!validation.isValid) {
-			const error = new Error(`Validation failed: ${validation.errors.join(', ')}`);
-			this.logger.error('User creation failed - validation error', error, { userData });
+			const error = new ValidationError(`Validation failed: ${validation.errors.join(', ')}`);
+			this.logger.error('User creation failed - validation error', error);
 			throw error;
 		}
 
@@ -70,8 +71,8 @@ export class UserService implements IUserService {
 		// Validation
 		const validation = this.validationService.validateUpdateUser(userData);
 		if (!validation.isValid) {
-			const error = new Error(`Validation failed: ${validation.errors.join(', ')}`);
-			this.logger.error('User update failed - validation error', error, { userId: id, userData });
+			const error = new ValidationError(`Validation failed: ${validation.errors.join(', ')}`);
+			this.logger.error('User update failed - validation error', error);
 			throw error;
 		}
 

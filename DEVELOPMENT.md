@@ -1,85 +1,306 @@
-# Development Guide: SvelteKit + Hono + Cloudflare
+# Development Guide: SvelteKit + Hono + Cloudflare Workers
 
-This guide explains how to develop, preview, and deploy your SvelteKit + Hono application on Cloudflare Workers.
+Comprehensive development guide for building, testing, and deploying this modern full-stack application with enterprise-grade architecture patterns.
 
-## 🚀 Quick Start
+## 🚀 Development Setup
 
 ### Prerequisites
 
-- Node.js 18+ and pnpm installed
-- Cloudflare account (for deployment)
-- Wrangler CLI installed globally: `npm install -g wrangler`
+- **Node.js 18+** and **pnpm**
+- **Cloudflare account** (for deployment)
+- **Wrangler CLI**: `npm install -g wrangler`
 
-### Development Setup
+### Quick Setup
 
-1. **Install dependencies:**
+```bash
+# Install dependencies
+pnpm install
 
-   ```bash
-   pnpm install
-   ```
+# Start development (choose one)
+pnpm dev          # Standard SvelteKit (recommended)
+pnpm dev:cf       # With Cloudflare Workers simulation
+```
 
-2. **Copy environment configuration:**
+### Development Modes
 
-   ```bash
-   cp .env.example .env.local
-   ```
+1. **SvelteKit Dev** (`pnpm dev`) - Best for UI development, fastest reload
+2. **Cloudflare Simulation** (`pnpm dev:cf`) - Test Workers environment locally
 
-3. **Start development server:**
+## ⚠️ Global Exception Handling
 
-   ```bash
-   # Standard SvelteKit development (recommended for frontend dev)
-   pnpm dev
+Comprehensive error handling system with custom error classes, global middleware, and structured logging.
 
-   # Or with Cloudflare Workers simulation
-   pnpm cf:dev
-   ```
+### Architecture Components
+
+- **Custom Error Classes** (`src/types/errors.ts`) - Typed error definitions
+- **Global Error Handler** (Hono `onError` middleware) - Centralized exception handling
+- **Structured Logging** - Contextual error logging with appropriate log levels
+- **Consistent Responses** - Standardized JSON error format
+
+### Custom Error Classes
+
+Type-safe error handling with automatic HTTP status mapping:
+
+```typescript
+// Available error classes (src/types/errors.ts)
+ValidationError     → HTTP 400
+BadRequestError     → HTTP 400
+UnauthorizedError   → HTTP 401
+ForbiddenError      → HTTP 403
+NotFoundError       → HTTP 404
+ConflictError       → HTTP 409
+InternalServerError → HTTP 500
+```
+
+**Usage in Services:**
+
+```typescript
+// Throw typed errors in your services
+throw new ValidationError('Email is required');
+throw new NotFoundError('User not found');
+```
+
+### Global Error Handler
+
+Implemented as Hono `onError` middleware for centralized exception handling:
+
+```typescript
+// Global error handler (src/routes/api/[...paths]/+server.ts)
+app.onError(async (error, c) => {
+	const logger = getLogger(c);
+
+	// Handle custom error classes with proper status codes
+	if (error instanceof NotFoundError) {
+		logger.warn('NotFoundError:', error.message);
+		return c.json(createErrorResponse(error.message), 404);
+	}
+
+	// Fallback to errorNames mapping
+	if (error.name && errorNames[error.name]) {
+		const statusCode = errorNames[error.name];
+		return c.json(createErrorResponse(error.message), statusCode);
+	}
+
+	// Unhandled errors
+	logger.error('Unhandled error', error);
+	return c.json(createErrorResponse('Internal server error'), 500);
+});
+```
+
+### Response Format
+
+All API responses follow a consistent structure:
+
+```typescript
+// Success response
+{ success: true, data: any, message?: string, timestamp: string }
+
+// Error response
+{ success: false, error: string, timestamp: string }
+```
+
+### Implementation Examples
+
+**In Services:**
+
+```typescript
+// src/services/user.service.ts
+export class UserService {
+	async getUserById(id: number): Promise<User | null> {
+		const user = await this.userRepository.findById(id);
+		if (!user) {
+			throw new NotFoundError('User not found'); // Auto-handled by global middleware
+		}
+		return user;
+	}
+
+	async createUser(userData: CreateUserRequest): Promise<User> {
+		const validation = this.validationService.validateCreateUser(userData);
+		if (!validation.isValid) {
+			throw new ValidationError(`Validation failed: ${validation.errors.join(', ')}`);
+		}
+		return await this.userRepository.create(userData);
+	}
+}
+```
+
+**In API Routes:**
+
+```typescript
+// Routes just throw - global handler catches and formats
+app.get('/users/:id', async (c): Promise<Response> => {
+	const id = parseIntParam(c.req.param('id'));
+	const userService = getUserService(c);
+
+	if (id === null) {
+		throw new BadRequestError('Invalid user ID'); // → 400 response
+	}
+
+	const user = await userService.getUserById(id); // May throw NotFoundError → 404
+
+	return c.json({ success: true, data: user, timestamp: new Date().toISOString() });
+});
+```
+
+### Logging Strategy
+
+The error handler uses different log levels based on HTTP status codes:
+
+- **Server Errors (500+)** - Logged as `error` level with full stack trace
+- **Client Errors (400-499)** - Logged as `warn` level with error message
+- **Legacy Validation Errors** - Handled for backward compatibility
+
+### Testing Error Scenarios
+
+**API Error Testing:**
+
+```typescript
+// tests/api/error-handling.test.ts
+import { describe, expect, it } from 'vitest';
+import { GET } from '../../routes/api/[...paths]/+server';
+
+describe('Error Handling', () => {
+	it('should return 400 for invalid user ID', async () => {
+		const request = new Request('http://localhost/api/users/invalid');
+		const response = await GET({ request } as RequestEvent);
+
+		expect(response.status).toBe(400);
+
+		const data = await response.json();
+		expect(data).toEqual({
+			success: false,
+			error: 'Invalid user ID',
+			timestamp: expect.any(String)
+		});
+	});
+
+	it('should return 404 for non-existent user', async () => {
+		const request = new Request('http://localhost/api/users/999');
+		const response = await GET({ request } as RequestEvent);
+
+		expect(response.status).toBe(404);
+
+		const data = await response.json();
+		expect(data.success).toBe(false);
+		expect(data.error).toBe('User not found');
+	});
+});
+```
+
+**Service Error Testing:**
+
+```typescript
+// tests/services/user.service.test.ts
+import { describe, expect, it } from 'vitest';
+import { UserService } from '../../services/user.service';
+import { BadRequestError, NotFoundError } from '../../types/errors';
+
+describe('UserService Error Handling', () => {
+	it('should throw BadRequestError for invalid ID', () => {
+		const userService = new UserService(mockRepository, mockValidator, mockLogger);
+
+		expect(() => userService.getUserById(-1)).toThrow(BadRequestError);
+		expect(() => userService.getUserById(-1)).toThrow('Invalid user ID');
+	});
+
+	it('should throw NotFoundError when user does not exist', async () => {
+		mockRepository.findById.mockResolvedValue(null);
+
+		const userService = new UserService(mockRepository, mockValidator, mockLogger);
+
+		await expect(userService.getUserById(999)).rejects.toThrow(NotFoundError);
+		await expect(userService.getUserById(999)).rejects.toThrow('User not found');
+	});
+});
+```
+
+### Best Practices
+
+1. **Use Specific Error Classes** - Choose the most appropriate error type
+2. **Provide Clear Messages** - Error messages should be user-friendly
+3. **Log Appropriately** - Server errors need investigation, client errors are warnings
+4. **Test Error Paths** - Ensure all error scenarios are covered in tests
+5. **Document Error Responses** - API documentation should include error examples
+
+### Creating New Error Types
+
+To add a new error type:
+
+1. **Define the Error Class:**
+
+```typescript
+// src/types/errors.ts
+export class RateLimitError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'RateLimitError';
+	}
+}
+```
+
+2. **Add to Error Mapping:**
+
+```typescript
+export const errorNames: Record<string, ContentfulStatusCode> = {
+	// ... existing mappings
+	[RateLimitError.name]: 429
+};
+```
+
+3. **Use in Services:**
+
+```typescript
+if (requestCount > limit) {
+	throw new RateLimitError('Rate limit exceeded');
+}
+```
+
+The global error handler will automatically catch and handle the new error type.
 
 ## 🔧 Development Workflows
 
-### Local Development Options
+### Development Modes
 
-1. **Standard SvelteKit Dev (Recommended for UI/Frontend work):**
+**SvelteKit Development** (Recommended):
 
-   ```bash
-   pnpm dev
-   ```
+```bash
+pnpm dev  # http://localhost:5173
+```
 
-   - Runs on `http://localhost:5173`
-   - Fastest hot reload
-   - Full TypeScript checking
-   - API routes work through SvelteKit
+- Fastest hot reload for UI development
+- Full TypeScript checking and validation
+- API routes work through SvelteKit dev server
 
-2. **Cloudflare Workers Simulation (For testing CF-specific features):**
+**Cloudflare Workers Simulation**:
 
-   ```bash
-   pnpm cf:dev
-   ```
+```bash
+pnpm dev:cf  # http://localhost:8787
+```
 
-   - Builds the app first
-   - Runs with Wrangler dev server
-   - Simulates Cloudflare Workers environment
-   - Runs on `http://localhost:8787`
+- Tests Cloudflare Workers environment locally
+- Simulates edge runtime and Workers APIs
+- Requires build step before running
 
 ### API Development
 
-The Hono API is located in `src/routes/api/[...paths]/+server.ts` and includes:
+All API routes are handled by the Hono server in `src/routes/api/[...paths]/+server.ts`:
 
-- **GET /api/health** - Health check endpoint
-- **GET /api/hello** - Basic hello endpoint
-- **GET /api/users** - List users (mock data)
-- **POST /api/users** - Create user (mock)
-- **PUT /api/users/:id** - Update user (mock)
-- **DELETE /api/users/:id** - Delete user (mock)
+- `/api/health` - System health check
+- `/api/hello` - API information
+- `/api/users` - CRUD operations (demo with in-memory data)
+- All endpoints include global error handling and structured logging
 
-### Environment Variables
+### Environment Configuration
 
-1. **Client-side variables** (prefix with `PUBLIC_`):
-   - Accessible in browser
-   - Configure in `src/lib/env.ts`
+**Client-side** (prefix with `PUBLIC_`):
 
-2. **Server-side variables**:
-   - Cloudflare Workers environment
-   - Configure in `wrangler.toml`
+- Accessible in browser code
+- Configured in `src/lib/env.ts`
+
+**Server-side** (Cloudflare Workers):
+
+- Configured in `wrangler.toml`
+- Available in API routes via `c.env`
 
 ## 🧪 Testing
 
@@ -146,11 +367,13 @@ describe('API Endpoints', () => {
 
 - ✅ GET/POST/PUT/DELETE operations
 - ✅ Request/response validation
-- ✅ Error handling
+- ✅ Error handling and custom error classes
 - ✅ Headers and CORS
 - ✅ Query parameters and URL params
 - ✅ JSON parsing and malformed data
 - ✅ Concurrent requests and performance
+- ✅ HTTP status code accuracy
+- ✅ Error response format consistency
 
 ### Component Testing (Svelte)
 
@@ -260,9 +483,13 @@ beforeEach(() => {
    ```typescript
    // Mock API calls
    MockAPI.mockSuccess({ data: 'test' });
+   MockAPI.mockError('Server error', 500);
 
    // Mock functions
    const onClick = vi.fn();
+
+   // Mock service errors
+   mockUserService.getUserById.mockRejectedValue(new NotFoundError('User not found'));
    ```
 
 4. **Use descriptive test names**:
@@ -332,24 +559,21 @@ Tests are designed to run in CI environments:
   run: pnpm test:coverage
 ```
 
-## 🏗️ Dependency Injection Container
+## 🏗️ Dependency Injection Architecture
 
-This project uses **InversifyJS** to implement a clean architecture with dependency injection, following SOLID principles for maintainable, testable code.
+**InversifyJS**-powered dependency injection system following SOLID principles for clean, testable architecture.
 
-### Architecture Overview
+### Core Components
 
-The dependency injection system is organized into several key components:
+- **Container** (`src/container/`) - IoC container configuration
+- **Interfaces** (`src/interfaces/`) - Service contracts and types
+- **Services** (`src/services/`) - Business logic implementations
+- **Resolvers** (`src/container/resolvers.ts`) - Helper functions for service resolution
 
-- **Container** - IoC container configuration (`src/container/`)
-- **Interfaces** - Service contracts (`src/interfaces/`)
-- **Services** - Concrete implementations (`src/services/`)
-- **Resolvers** - Helper functions for service resolution
+### Container Setup
 
-### Container Configuration
+**Service Registration** (`src/container/inversify.config.ts`):
 
-#### Core Files
-
-**`src/container/inversify.config.ts`** - Main container setup:
 ```typescript
 import 'reflect-metadata';
 import { Container } from 'inversify';
@@ -357,80 +581,55 @@ import { TYPES } from './types';
 
 const container = new Container();
 
-// Bind services
-container.bind<IUserService>(TYPES.UserService).to(UserService);
+// Bind services with appropriate scopes
+container.bind<IUserService>(TYPES.UserService).to(UserService); // Transient
 container.bind<IUserRepository>(TYPES.UserRepository).to(UserRepository).inSingletonScope();
-// ... other bindings
+container.bind<ILogger>(TYPES.Logger).to(Logger).inSingletonScope();
 ```
 
-**`src/container/types.ts`** - Service identifiers:
-```typescript
-export const TYPES = {
-  UserService: Symbol.for('UserService'),
-  UserRepository: Symbol.for('UserRepository'),
-  Logger: Symbol.for('Logger'),
-  // ... other types
-} as const;
-```
+**Service Resolution** (`src/container/resolvers.ts`):
 
-**`src/container/resolvers.ts`** - Service resolution helpers:
 ```typescript
-export const getUserService = (c: Context) => {
-  return getService<IUserService>(c, TYPES.UserService);
-};
+export const getUserService = (c: Context) => getService<IUserService>(c, TYPES.UserService);
 
-export const getLogger = (c: Context) => {
-  return getService<ILogger>(c, TYPES.Logger);
-};
+export const getLogger = (c: Context) => getService<ILogger>(c, TYPES.Logger);
 ```
 
 ### Service Architecture
 
-#### User Domain Services
+#### Domain Services
 
-**UserService** - Business logic orchestration
-- Coordinates between repository and validation
-- Handles business rules and logging
-- Scope: Transient (new instance per request)
-
-**UserRepository** - Data access layer
-- Manages user persistence (currently in-memory)
-- Provides CRUD operations
-- Scope: Singleton (shared instance)
-
-**UserValidationService** - Input validation
-- Validates create/update requests
-- Returns structured validation results
-- Scope: Transient
+| Service                 | Purpose                       | Scope     |
+| ----------------------- | ----------------------------- | --------- |
+| `UserService`           | Business logic orchestration  | Transient |
+| `UserRepository`        | Data access layer (in-memory) | Singleton |
+| `UserValidationService` | Input validation              | Transient |
 
 #### Infrastructure Services
 
-**Logger** - Structured logging
-- Context-aware logging with metadata
-- JSON-formatted output for production
-- Scope: Singleton
-
-**ConfigService** - Configuration management
-- Environment variable access
-- Safe defaults for all environments
-- Scope: Singleton
+| Service         | Purpose                         | Scope     |
+| --------------- | ------------------------------- | --------- |
+| `Logger`        | Structured logging with context | Singleton |
+| `ConfigService` | Environment configuration       | Singleton |
 
 ### Creating New Services
 
 #### 1. Define Interface
 
 Create interface in `src/interfaces/`:
+
 ```typescript
 // src/interfaces/email.interface.ts
 export interface IEmailService {
-  sendWelcomeEmail(email: string, name: string): Promise<void>;
-  sendNotification(email: string, message: string): Promise<void>;
+	sendWelcomeEmail(email: string, name: string): Promise<void>;
+	sendNotification(email: string, message: string): Promise<void>;
 }
 ```
 
 #### 2. Implement Service
 
 Create implementation in `src/services/`:
+
 ```typescript
 // src/services/email.service.ts
 import { injectable, inject } from 'inversify';
@@ -440,33 +639,33 @@ import { TYPES } from '../container/types';
 
 @injectable()
 export class EmailService implements IEmailService {
-  constructor(
-    @inject(TYPES.Logger) private readonly logger: ILogger
-  ) {}
+	constructor(@inject(TYPES.Logger) private readonly logger: ILogger) {}
 
-  async sendWelcomeEmail(email: string, name: string): Promise<void> {
-    this.logger.info('Sending welcome email', { email, name });
-    // Implementation here
-  }
+	async sendWelcomeEmail(email: string, name: string): Promise<void> {
+		this.logger.info('Sending welcome email', { email, name });
+		// Implementation here
+	}
 
-  async sendNotification(email: string, message: string): Promise<void> {
-    this.logger.info('Sending notification', { email });
-    // Implementation here
-  }
+	async sendNotification(email: string, message: string): Promise<void> {
+		this.logger.info('Sending notification', { email });
+		// Implementation here
+	}
 }
 ```
 
 #### 3. Register in Container
 
 Add to `src/container/types.ts`:
+
 ```typescript
 export const TYPES = {
-  // ... existing types
-  EmailService: Symbol.for('EmailService'),
+	// ... existing types
+	EmailService: Symbol.for('EmailService')
 } as const;
 ```
 
 Add to `src/container/inversify.config.ts`:
+
 ```typescript
 import { EmailService } from '../services/email.service';
 import type { IEmailService } from '../interfaces/email.interface';
@@ -478,9 +677,10 @@ container.bind<IEmailService>(TYPES.EmailService).to(EmailService);
 #### 4. Create Resolver
 
 Add to `src/container/resolvers.ts`:
+
 ```typescript
 export const getEmailService = (c: Context) => {
-  return getService<IEmailService>(c, TYPES.EmailService);
+	return getService<IEmailService>(c, TYPES.EmailService);
 };
 ```
 
@@ -490,13 +690,13 @@ export const getEmailService = (c: Context) => {
 import { getEmailService } from '../container/resolvers';
 
 app.post('/users', async (c) => {
-  const emailService = getEmailService(c);
-  const userService = getUserService(c);
+	const emailService = getEmailService(c);
+	const userService = getUserService(c);
 
-  const user = await userService.createUser(userData);
-  await emailService.sendWelcomeEmail(user.email, user.name);
+	const user = await userService.createUser(userData);
+	await emailService.sendWelcomeEmail(user.email, user.name);
 
-  return c.json({ success: true, data: user });
+	return c.json({ success: true, data: user });
 });
 ```
 
@@ -511,35 +711,35 @@ import { Container } from 'inversify';
 import type { IUserService } from '../../interfaces/user.interface';
 
 describe('User API with Mocked Services', () => {
-  let mockContainer: Container;
-  let mockUserService: IUserService;
+	let mockContainer: Container;
+	let mockUserService: IUserService;
 
-  beforeEach(() => {
-    // Create mock service
-    mockUserService = {
-      getAllUsers: vi.fn(),
-      getUserById: vi.fn(),
-      createUser: vi.fn(),
-      updateUser: vi.fn(),
-      deleteUser: vi.fn()
-    };
+	beforeEach(() => {
+		// Create mock service
+		mockUserService = {
+			getAllUsers: vi.fn(),
+			getUserById: vi.fn(),
+			createUser: vi.fn(),
+			updateUser: vi.fn(),
+			deleteUser: vi.fn()
+		};
 
-    // Create test container
-    mockContainer = new Container();
-    mockContainer.bind(TYPES.UserService).toConstantValue(mockUserService);
-  });
+		// Create test container
+		mockContainer = new Container();
+		mockContainer.bind(TYPES.UserService).toConstantValue(mockUserService);
+	});
 
-  it('should return users from service', async () => {
-    const mockUsers = [{ id: 1, name: 'Test User' }];
-    vi.mocked(mockUserService.getAllUsers).mockResolvedValue(mockUsers);
+	it('should return users from service', async () => {
+		const mockUsers = [{ id: 1, name: 'Test User' }];
+		vi.mocked(mockUserService.getAllUsers).mockResolvedValue(mockUsers);
 
-    // Test implementation
-    const request = new Request('http://localhost/api/users');
-    const response = await GET({ request, c: { container: mockContainer } });
-    
-    expect(response.status).toBe(200);
-    expect(mockUserService.getAllUsers).toHaveBeenCalled();
-  });
+		// Test implementation
+		const request = new Request('http://localhost/api/users');
+		const response = await GET({ request, c: { container: mockContainer } });
+
+		expect(response.status).toBe(200);
+		expect(mockUserService.getAllUsers).toHaveBeenCalled();
+	});
 });
 ```
 
@@ -552,103 +752,114 @@ import { UserService } from '../../services/user.service';
 import type { IUserRepository, IUserValidationService } from '../../interfaces/user.interface';
 
 describe('UserService', () => {
-  let userService: UserService;
-  let mockRepository: IUserRepository;
-  let mockValidator: IUserValidationService;
-  let mockLogger: ILogger;
+	let userService: UserService;
+	let mockRepository: IUserRepository;
+	let mockValidator: IUserValidationService;
+	let mockLogger: ILogger;
 
-  beforeEach(() => {
-    mockRepository = { /* mock methods */ };
-    mockValidator = { /* mock methods */ };
-    mockLogger = { /* mock methods */ };
-    
-    userService = new UserService(mockRepository, mockValidator, mockLogger);
-  });
+	beforeEach(() => {
+		mockRepository = {
+			/* mock methods */
+		};
+		mockValidator = {
+			/* mock methods */
+		};
+		mockLogger = {
+			/* mock methods */
+		};
 
-  it('should create user when validation passes', async () => {
-    // Arrange
-    const userData = { name: 'John', email: 'john@example.com' };
-    vi.mocked(mockValidator.validateCreateUser).mockReturnValue({
-      isValid: true,
-      errors: []
-    });
-    vi.mocked(mockRepository.create).mockResolvedValue({
-      id: 1,
-      ...userData,
-      createdAt: new Date()
-    });
+		userService = new UserService(mockRepository, mockValidator, mockLogger);
+	});
 
-    // Act
-    const result = await userService.createUser(userData);
+	it('should create user when validation passes', async () => {
+		// Arrange
+		const userData = { name: 'John', email: 'john@example.com' };
+		vi.mocked(mockValidator.validateCreateUser).mockReturnValue({
+			isValid: true,
+			errors: []
+		});
+		vi.mocked(mockRepository.create).mockResolvedValue({
+			id: 1,
+			...userData,
+			createdAt: new Date()
+		});
 
-    // Assert
-    expect(result).toHaveProperty('id', 1);
-    expect(mockValidator.validateCreateUser).toHaveBeenCalledWith(userData);
-    expect(mockRepository.create).toHaveBeenCalled();
-  });
+		// Act
+		const result = await userService.createUser(userData);
+
+		// Assert
+		expect(result).toHaveProperty('id', 1);
+		expect(mockValidator.validateCreateUser).toHaveBeenCalledWith(userData);
+		expect(mockRepository.create).toHaveBeenCalled();
+	});
 });
 ```
 
 ### Best Practices
 
 #### 1. Interface Design
+
 - Keep interfaces focused and cohesive
 - Use descriptive method names
 - Return appropriate types (avoid `any`)
 
 #### 2. Service Implementation
+
 - Use `@injectable()` decorator on all services
 - Use `@inject()` for all dependencies
 - Follow single responsibility principle
 
 #### 3. Dependency Management
+
 - Use constructor injection
 - Prefer interfaces over concrete types
 - Configure appropriate scopes (singleton vs transient)
 
 #### 4. Error Handling
+
 ```typescript
 @injectable()
 export class UserService implements IUserService {
-  async createUser(userData: CreateUserRequest): Promise<User> {
-    try {
-      // Validation
-      const validation = this.validationService.validateCreateUser(userData);
-      if (!validation.isValid) {
-        const error = new Error(`Validation failed: ${validation.errors.join(', ')}`);
-        this.logger.error('User creation failed', error, { userData });
-        throw error;
-      }
+	async createUser(userData: CreateUserRequest): Promise<User> {
+		try {
+			// Validation
+			const validation = this.validationService.validateCreateUser(userData);
+			if (!validation.isValid) {
+				const error = new Error(`Validation failed: ${validation.errors.join(', ')}`);
+				this.logger.error('User creation failed', error, { userData });
+				throw error;
+			}
 
-      // Business logic
-      const user = await this.userRepository.create(userData);
-      this.logger.info('User created successfully', { userId: user.id });
-      
-      return user;
-    } catch (error) {
-      this.logger.error('Failed to create user', error as Error, { userData });
-      throw error;
-    }
-  }
+			// Business logic
+			const user = await this.userRepository.create(userData);
+			this.logger.info('User created successfully', { userId: user.id });
+
+			return user;
+		} catch (error) {
+			this.logger.error('Failed to create user', error as Error, { userData });
+			throw error;
+		}
+	}
 }
 ```
 
 #### 5. Configuration and Environment
+
 ```typescript
 @injectable()
 export class ConfigService implements IConfigService {
-  getAppConfig(): IAppConfig {
-    return {
-      port: parseInt(this.getEnv('PORT', '3000')),
-      environment: this.getEnv('NODE_ENV', 'development'),
-      apiVersion: this.getEnv('API_VERSION', '1.0.0')
-    };
-  }
+	getAppConfig(): IAppConfig {
+		return {
+			port: parseInt(this.getEnv('PORT', '3000')),
+			environment: this.getEnv('NODE_ENV', 'development'),
+			apiVersion: this.getEnv('API_VERSION', '1.0.0')
+		};
+	}
 
-  private getEnv(key: string, defaultValue: string): string {
-    // Safe environment variable access for edge runtimes
-    return process.env[key] ?? defaultValue;
-  }
+	private getEnv(key: string, defaultValue: string): string {
+		// Safe environment variable access for edge runtimes
+		return process.env[key] ?? defaultValue;
+	}
 }
 ```
 
@@ -676,17 +887,17 @@ export class ConfigService implements IConfigService {
 ```typescript
 // Add logging to container resolution
 export const getService = <T>(c: Context, serviceType: symbol): T => {
-  const diContainer = c.get('container');
-  console.log(`Resolving service: ${serviceType.toString()}`);
-  
-  try {
-    const service = diContainer.get<T>(serviceType);
-    console.log(`Service resolved successfully: ${serviceType.toString()}`);
-    return service;
-  } catch (error) {
-    console.error(`Failed to resolve service: ${serviceType.toString()}`, error);
-    throw error;
-  }
+	const diContainer = c.get('container');
+	console.log(`Resolving service: ${serviceType.toString()}`);
+
+	try {
+		const service = diContainer.get<T>(serviceType);
+		console.log(`Service resolved successfully: ${serviceType.toString()}`);
+		return service;
+	} catch (error) {
+		console.error(`Failed to resolve service: ${serviceType.toString()}`, error);
+		throw error;
+	}
 };
 ```
 
@@ -750,7 +961,7 @@ src/
 │           └── +server.ts     # Hono API server
 ├── container/                # Dependency Injection Container
 │   ├── inversify.config.ts   # IoC container configuration
-│   ├── types.ts              # Service type identifiers  
+│   ├── types.ts              # Service type identifiers
 │   └── resolvers.ts          # Service resolution helpers
 ├── interfaces/               # Service contracts
 │   ├── user.interface.ts     # User domain interfaces
@@ -828,6 +1039,8 @@ Configuration:
    - Check mock configurations in `src/tests/setup.ts`
    - Verify component imports and data-testid attributes
    - Use `screen.debug()` to inspect DOM state
+   - Test error scenarios with proper error class mocking
+   - Verify HTTP status codes in API tests
 
 ### Development Tips
 

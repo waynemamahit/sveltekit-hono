@@ -7,6 +7,7 @@ import { logger } from 'hono/logger';
 import 'reflect-metadata';
 import { container } from '../../../container/inversify.config';
 import { getLogger, getUserService } from '../../../container/resolvers';
+import { BadRequestError, errorNames, NotFoundError, ValidationError } from '../../../types/errors';
 import type { HealthStatus } from '../../../types/health';
 
 interface ApiResponse<T = unknown> {
@@ -23,23 +24,6 @@ function createErrorResponse(error: string): ApiResponse {
 		error,
 		timestamp: new Date().toISOString()
 	};
-}
-
-function handleError(c: Context, error: unknown, operation: string): Response {
-	const logger = getLogger(c);
-	const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-	// Handle validation errors
-	if (errorMessage.includes('Validation failed')) {
-		logger.warn(`${operation} failed - validation error`, {
-			error: errorMessage
-		});
-		return c.json(createErrorResponse(errorMessage), 400);
-	}
-
-	// Handle general errors
-	logger.error(`Error in ${operation}`, error instanceof Error ? error : new Error(String(error)));
-	return c.json(createErrorResponse('Internal server error'), 500);
 }
 
 function parseIntParam(param: string): number | null {
@@ -66,6 +50,54 @@ app.use('*', async (c: Context, next: Next) => {
 	await next();
 });
 
+// Global error handler middleware
+app.onError(async (error, c) => {
+	const logger = getLogger(c);
+	const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+	// Handle known custom errors - check instanceof first, then fallback to name
+	if (error instanceof NotFoundError) {
+		logger.warn(`NotFoundError: ${errorMessage}`, { errorMessage });
+		return c.json(createErrorResponse(errorMessage), 404);
+	}
+
+	if (error instanceof BadRequestError) {
+		logger.warn(`BadRequestError: ${errorMessage}`, { errorMessage });
+		return c.json(createErrorResponse(errorMessage), 400);
+	}
+
+	if (error instanceof ValidationError) {
+		logger.warn(`ValidationError: ${errorMessage}`, { errorMessage });
+		return c.json(createErrorResponse(errorMessage), 400);
+	}
+
+	// Fallback to errorNames mapping
+	if (error instanceof Error && error.name && errorNames[error.name]) {
+		const statusCode = errorNames[error.name];
+		logger.info(`Handling custom error via errorNames: ${error.name} with status ${statusCode}`, {
+			errorMessage
+		});
+
+		if (statusCode >= 500) {
+			logger.error(`${error.name}: ${errorMessage}`, error);
+		} else {
+			logger.warn(`${error.name}: ${errorMessage}`, { errorMessage });
+		}
+
+		return c.json(createErrorResponse(errorMessage), statusCode);
+	}
+
+	// Handle validation errors from services (legacy support)
+	if (errorMessage.includes('Validation failed')) {
+		logger.warn('Service validation error (legacy)', { errorMessage });
+		return c.json(createErrorResponse(errorMessage), 400);
+	}
+
+	// Handle general errors
+	logger.error('Unhandled error', error instanceof Error ? error : new Error(String(error)));
+	return c.json(createErrorResponse('Internal server error'), 500);
+});
+
 // Health check endpoint
 app.get('/health', (c): Response => {
 	const response: HealthStatus = {
@@ -89,127 +121,107 @@ app.get('/hello', (c): Response => {
 
 // User CRUD endpoints with Dependency Injection
 app.get('/users', async (c): Promise<Response> => {
-	try {
-		const userService = getUserService(c);
-		const logger = getLogger(c);
+	const userService = getUserService(c);
+	const logger = getLogger(c);
 
-		logger.info('GET /users endpoint called');
-		const users = await userService.getAllUsers();
+	logger.info('GET /users endpoint called');
+	const users = await userService.getAllUsers();
 
-		return c.json({
-			success: true,
-			data: users,
-			timestamp: new Date().toISOString()
-		});
-	} catch (error) {
-		return handleError(c, error, 'fetching users');
-	}
+	return c.json({
+		success: true,
+		data: users,
+		timestamp: new Date().toISOString()
+	});
 });
 
 app.get('/users/:id', async (c): Promise<Response> => {
-	try {
-		const id = parseIntParam(c.req.param('id'));
-		const userService = getUserService(c);
-		const logger = getLogger(c);
+	const id = parseIntParam(c.req.param('id'));
+	const userService = getUserService(c);
+	const logger = getLogger(c);
 
-		if (id === null) {
-			return c.json(createErrorResponse('Invalid user ID'), 400);
-		}
-
-		logger.info('GET /users/:id endpoint called', { userId: id });
-		const user = await userService.getUserById(id);
-
-		if (!user) {
-			return c.json(createErrorResponse('User not found'), 404);
-		}
-
-		return c.json({
-			success: true,
-			data: user,
-			timestamp: new Date().toISOString()
-		});
-	} catch (error) {
-		return handleError(c, error, 'fetching user');
+	if (id === null) {
+		throw new BadRequestError('Invalid user ID');
 	}
+
+	logger.info('GET /users/:id endpoint called', { userId: id });
+	const user = await userService.getUserById(id);
+
+	if (!user) {
+		throw new NotFoundError('User not found');
+	}
+
+	return c.json({
+		success: true,
+		data: user,
+		timestamp: new Date().toISOString()
+	});
 });
 
 app.post('/users', async (c): Promise<Response> => {
-	try {
-		const body = await c.req.json();
-		const userService = getUserService(c);
-		const logger = getLogger(c);
+	const body = await c.req.json();
+	const userService = getUserService(c);
+	const logger = getLogger(c);
 
-		logger.info('POST /users endpoint called', { userData: body });
-		const newUser = await userService.createUser(body);
+	logger.info('POST /users endpoint called', { userData: body });
+	const newUser = await userService.createUser(body);
 
-		return c.json(
-			{
-				success: true,
-				data: newUser,
-				message: 'User created successfully',
-				timestamp: new Date().toISOString()
-			},
-			201
-		);
-	} catch (error) {
-		return handleError(c, error, 'creating user');
-	}
+	return c.json(
+		{
+			success: true,
+			data: newUser,
+			message: 'User created successfully',
+			timestamp: new Date().toISOString()
+		},
+		201
+	);
 });
 
 app.put('/users/:id', async (c): Promise<Response> => {
-	try {
-		const id = parseIntParam(c.req.param('id'));
-		const body = await c.req.json();
-		const userService = getUserService(c);
-		const logger = getLogger(c);
+	const id = parseIntParam(c.req.param('id'));
+	const body = await c.req.json();
+	const userService = getUserService(c);
+	const logger = getLogger(c);
 
-		if (id === null) {
-			return c.json(createErrorResponse('Invalid user ID'), 400);
-		}
-
-		logger.info('PUT /users/:id endpoint called', { userId: id, updateData: body });
-		const updatedUser = await userService.updateUser(id, body);
-
-		if (!updatedUser) {
-			return c.json(createErrorResponse('User not found'), 404);
-		}
-
-		return c.json({
-			success: true,
-			data: updatedUser,
-			message: `User ${id} updated successfully`,
-			timestamp: new Date().toISOString()
-		});
-	} catch (error) {
-		return handleError(c, error, 'updating user');
+	if (id === null) {
+		throw new BadRequestError('Invalid user ID');
 	}
+
+	logger.info('PUT /users/:id endpoint called', { userId: id, updateData: body });
+	const updatedUser = await userService.updateUser(id, body);
+
+	if (!updatedUser) {
+		throw new NotFoundError('User not found');
+	}
+
+	return c.json({
+		success: true,
+		data: updatedUser,
+		message: `User ${id} updated successfully`,
+		timestamp: new Date().toISOString()
+	});
 });
 
 app.delete('/users/:id', async (c): Promise<Response> => {
-	try {
-		const id = parseIntParam(c.req.param('id'));
-		const userService = getUserService(c);
-		const logger = getLogger(c);
+	const id = parseIntParam(c.req.param('id'));
+	const userService = getUserService(c);
+	const logger = getLogger(c);
 
-		if (id === null) {
-			return c.json(createErrorResponse('Invalid user ID'), 400);
-		}
-
-		logger.info('DELETE /users/:id endpoint called', { userId: id });
-		const deleted = await userService.deleteUser(id);
-
-		if (!deleted) {
-			return c.json(createErrorResponse('User not found'), 404);
-		}
-
-		return c.json({
-			success: true,
-			message: `User ${id} deleted successfully`,
-			timestamp: new Date().toISOString()
-		});
-	} catch (error) {
-		return handleError(c, error, 'deleting user');
+	if (id === null) {
+		throw new BadRequestError('Invalid user ID');
 	}
+
+	logger.info('DELETE /users/:id endpoint called', { userId: id });
+	const deleted = await userService.deleteUser(id);
+
+	if (!deleted) {
+		throw new NotFoundError('User not found');
+	}
+
+	return c.json({
+		success: true,
+		message: `User ${id} deleted successfully`,
+		timestamp: new Date().toISOString()
+	});
 });
 
 // Catch-all for testing dynamic routes

@@ -1,6 +1,6 @@
 # 🚀 SvelteKit + Hono + Cloudflare Workers
 
-A modern, full-stack web application template combining the power of **SvelteKit** frontend with **Hono** API backend, optimized for deployment on **Cloudflare Workers**.
+A modern, production-ready full-stack template combining **SvelteKit**, **Hono**, and **Cloudflare Workers** with enterprise-grade architecture patterns including dependency injection, comprehensive testing, and global error handling.
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Svelte](https://img.shields.io/badge/Svelte-4A4A55?style=for-the-badge&logo=svelte&logoColor=FF3E00)](https://svelte.dev/)
@@ -9,19 +9,28 @@ A modern, full-stack web application template combining the power of **SvelteKit
 [![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
 
-## ✨ Features
+## ✨ Key Features
 
-- 🔥 **Lightning Fast** - SvelteKit for optimal performance and developer experience
-- 🌐 **Global Edge Deployment** - Cloudflare Workers for worldwide low-latency
-- 🛠️ **Type-Safe API** - Hono with full TypeScript support and validation
-- 🏗️ **Dependency Injection** - InversifyJS for clean architecture and testability
-- 🎯 **SOLID Principles** - Clean code architecture with proper separation of concerns
-- 🎨 **Modern UI** - TailwindCSS for beautiful, responsive design
-- 🔧 **Developer Experience** - Hot reload, TypeScript, ESLint, Prettier
-- 🧪 **Comprehensive Testing** - Vitest with API and component testing setup
-- 🚀 **Production Ready** - Optimized builds and edge-side caching
-- 🔒 **Environment Management** - Secure variable handling for all environments
-- 📊 **Built-in Monitoring** - Health checks and request logging
+### 🏗️ **Enterprise Architecture**
+
+- **Dependency Injection** with InversifyJS for clean, testable code
+- **SOLID Principles** implementation with proper separation of concerns
+- **Custom Error Classes** with global exception handling
+- **Type-Safe APIs** with comprehensive TypeScript support
+
+### 🚀 **Modern Stack**
+
+- **SvelteKit 2** for lightning-fast frontend with Svelte 5
+- **Hono** for high-performance API routes
+- **Cloudflare Workers** for global edge deployment
+- **TailwindCSS 4** for modern, responsive UI
+
+### 🧪 **Developer Experience**
+
+- **Comprehensive Testing** with Vitest (API + Component tests)
+- **Hot Reload** development with TypeScript, ESLint, Prettier
+- **Health Checks** and structured logging
+- **Environment Management** for all deployment stages
 
 ## 🏗️ Tech Stack
 
@@ -54,13 +63,13 @@ This project implements a clean architecture using **InversifyJS** for dependenc
 
 ### Service Layer Overview
 
-| Service | Purpose | Scope |
-|---------|---------|-------|
-| `UserService` | User business logic and orchestration | Transient |
-| `UserRepository` | Data access and persistence | Singleton |
-| `UserValidationService` | Input validation and business rules | Transient |
-| `Logger` | Structured logging with context | Singleton |
-| `ConfigService` | Environment and app configuration | Singleton |
+| Service                 | Purpose                               | Scope     |
+| ----------------------- | ------------------------------------- | --------- |
+| `UserService`           | User business logic and orchestration | Transient |
+| `UserRepository`        | Data access and persistence           | Singleton |
+| `UserValidationService` | Input validation and business rules   | Transient |
+| `Logger`                | Structured logging with context       | Singleton |
+| `ConfigService`         | Environment and app configuration     | Singleton |
 
 ### Usage Example
 
@@ -69,13 +78,13 @@ This project implements a clean architecture using **InversifyJS** for dependenc
 import { getUserService, getLogger } from '../container/resolvers';
 
 app.get('/users', async (c) => {
-  const userService = getUserService(c);
-  const logger = getLogger(c);
-  
-  logger.info('Fetching users');
-  const users = await userService.getAllUsers();
-  
-  return c.json({ success: true, data: users });
+	const userService = getUserService(c);
+	const logger = getLogger(c);
+
+	logger.info('Fetching users');
+	const users = await userService.getAllUsers();
+
+	return c.json({ success: true, data: users });
 });
 ```
 
@@ -83,323 +92,263 @@ app.get('/users', async (c) => {
 
 ### Prerequisites
 
-- **Node.js** 18+ and **pnpm** installed
-- **Cloudflare account** (for deployment)
-- **Wrangler CLI**: `npm install -g wrangler`
+- Node.js 18+
+- pnpm (recommended) or npm
+- Cloudflare account (for deployment)
 
-### Installation
-
-1. **Clone the repository**
-
-   ```bash
-   git clone <your-repo-url>
-   cd sveltekit-hono
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   pnpm install
-   ```
-
-3. **Set up environment variables**
-
-   ```bash
-   cp .env.example .env.local
-   ```
-
-4. **Start development server**
-
-   ```bash
-   pnpm dev
-   ```
-
-5. **Open your browser**
-   Visit [http://localhost:5173](http://localhost:5173)
-
-## 🛠️ Development
-
-### Available Scripts
-
-| Command              | Description                                 |
-| -------------------- | ------------------------------------------- |
-| `pnpm dev`           | Start SvelteKit development server          |
-| `pnpm dev:cf`        | Start Cloudflare Workers development server |
-| `pnpm build`         | Build for production                        |
-| `pnpm preview`       | Preview production build locally            |
-| `pnpm preview:cf`    | Preview with Cloudflare Workers simulation  |
-| `pnpm test`          | Run tests in watch mode                     |
-| `pnpm test:run`      | Run all tests once                          |
-| `pnpm test:ui`       | Run tests with interactive UI               |
-| `pnpm test:coverage` | Run tests with coverage report              |
-| `pnpm deploy`        | Deploy to Cloudflare Workers                |
-| `pnpm deploy:cf`     | Deploy to Cloudflare production environment |
-| `pnpm check`         | Run TypeScript and Svelte checks            |
-| `pnpm lint`          | Lint code with ESLint and Prettier          |
-| `pnpm format`        | Format code with Prettier                   |
-
-### Development Workflows
-
-**For Frontend Development:**
+### Get Started in 2 Minutes
 
 ```bash
-pnpm dev  # Fastest hot reload, recommended for UI work
+# Clone and install
+git clone <your-repo-url>
+cd sveltekit-hono
+pnpm install
+
+# Start development
+pnpm dev
 ```
 
-**For Full-Stack with Cloudflare Simulation:**
+**That's it!** Visit [http://localhost:5173](http://localhost:5173)
+
+### For Cloudflare Development
 
 ```bash
-pnpm dev:cf  # Test with Cloudflare Workers environment
+# Install Wrangler CLI (one-time setup)
+npm install -g wrangler
+
+# Run with Cloudflare Workers simulation
+pnpm dev:cf
+```
+
+## 🛠️ Development Commands
+
+### Core Development
+
+```bash
+pnpm dev           # SvelteKit dev server (recommended)
+pnpm dev:cf        # Cloudflare Workers simulation
+pnpm build         # Production build
+pnpm preview       # Preview built app
+```
+
+### Quality & Testing
+
+```bash
+pnpm test          # Tests in watch mode
+pnpm test:run      # Run all tests once
+pnpm test:ui       # Interactive test UI
+pnpm test:coverage # Coverage reports
+pnpm check         # TypeScript validation
+pnpm lint          # Code linting
+pnpm format        # Code formatting
+```
+
+### Deployment
+
+```bash
+pnpm deploy        # Deploy to dev
+pnpm deploy:cf     # Deploy to production
 ```
 
 ## 🌐 API Endpoints
 
-The Hono API provides the following endpoints:
+Built with **Hono** and comprehensive error handling:
 
-| Method   | Endpoint         | Description                            |
-| -------- | ---------------- | -------------------------------------- |
-| `GET`    | `/api/health`    | Health check and environment info      |
-| `GET`    | `/api/hello`     | Basic hello endpoint with request info |
-| `GET`    | `/api/users`     | Get all users (demo data)              |
-| `POST`   | `/api/users`     | Create a new user                      |
-| `PUT`    | `/api/users/:id` | Update user by ID                      |
-| `DELETE` | `/api/users/:id` | Delete user by ID                      |
+### Core Endpoints
 
-### Example API Usage
+| Method | Endpoint      | Description                  |
+| ------ | ------------- | ---------------------------- |
+| `GET`  | `/api/health` | System health check          |
+| `GET`  | `/api/hello`  | API info and request details |
+
+### User Management (Demo CRUD)
+
+| Method   | Endpoint         | Description     | Status Codes       |
+| -------- | ---------------- | --------------- | ------------------ |
+| `GET`    | `/api/users`     | List all users  | 200, 500           |
+| `GET`    | `/api/users/:id` | Get user by ID  | 200, 400, 404, 500 |
+| `POST`   | `/api/users`     | Create new user | 201, 400, 409, 500 |
+| `PUT`    | `/api/users/:id` | Update user     | 200, 400, 404, 500 |
+| `DELETE` | `/api/users/:id` | Delete user     | 200, 400, 404, 500 |
+
+### Response Format
+
+Consistent JSON responses across all endpoints:
 
 ```typescript
-// Fetch users
-const response = await fetch('/api/users');
-const { users } = await response.json();
+// Success
+{ "success": true, "data": any, "message?": string, "timestamp": string }
 
-// Create user
-const newUser = await fetch('/api/users', {
-	method: 'POST',
-	headers: { 'Content-Type': 'application/json' },
-	body: JSON.stringify({ name: 'John Doe', email: 'john@example.com' })
-});
+// Error
+{ "success": false, "error": string, "timestamp": string }
 ```
+
+### Quick API Test
+
+```bash
+# Health check
+curl http://localhost:5173/api/health
+
+# List users (demo data)
+curl http://localhost:5173/api/users
+
+# Create user
+curl -X POST http://localhost:5173/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"John Doe","email":"john@example.com"}'
+```
+
+### Error Handling
+
+**Custom Error Classes** with proper HTTP status codes:
+
+- `ValidationError` (400) - Invalid input data
+- `NotFoundError` (404) - Resource not found
+- `ConflictError` (409) - Duplicate resources
+- Plus: `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `InternalServerError`
+
+**Global Error Handler** catches all exceptions and returns consistent JSON responses with structured logging.
 
 ## 🧪 Testing
 
-This project includes comprehensive testing for both API endpoints and Svelte components.
-
-### Running Tests
+Comprehensive test suite with **Vitest** + **Testing Library**:
 
 ```bash
-# Run all tests
-pnpm test:run
-
-# Run tests in watch mode during development
-pnpm test
-
-# Run tests with interactive UI
-pnpm test:ui
-
-# Generate coverage report
-pnpm test:coverage
+# Run tests
+pnpm test:run          # All tests once
+pnpm test             # Watch mode
+pnpm test:ui          # Interactive UI
+pnpm test:coverage    # With coverage
 ```
 
-### Test Structure
+### What's Tested
 
-- **API Tests** - Test Hono endpoints with request/response validation
-- **Component Tests** - Test Svelte components with user interactions
-- **Integration Tests** - End-to-end functionality testing
+- **API Endpoints** - Request/response validation, error handling
+- **Svelte Components** - User interactions, form validation
+- **Services** - Business logic with dependency injection
+- **Error Scenarios** - Custom error classes and status codes
 
-```bash
-# Run specific test types
-pnpm test:run src/tests/api/        # API tests only
-pnpm test:run src/tests/components/ # Component tests only
-```
-
-### Example Tests
-
-**API Testing:**
-
-```typescript
-it('should return health status', async () => {
-	const request = new Request('http://localhost/api/health');
-	const response = await GET({ request } as RequestEvent);
-
-	expect(response.status).toBe(200);
-	const data = await response.json();
-	expect(data).toHaveProperty('status', 'ok');
-});
-```
-
-**Component Testing:**
-
-```typescript
-it('should render and handle events', async () => {
-	const onClick = vi.fn();
-	const { getByTestId } = render(MyComponent, { onClick });
-
-	await fireEvent.click(getByTestId('button'));
-	expect(onClick).toHaveBeenCalled();
-});
-```
-
-## 📁 Project Structure
+## 📝 Project Structure
 
 ```
-├── src/
-│   ├── routes/
-│   │   ├── +page.svelte          # Main demo page
-│   │   ├── +layout.svelte        # App layout
-│   │   └── api/
-│   │       └── [...paths]/
-│   │           └── +server.ts     # Hono API server
-│   ├── container/                # Dependency Injection Container
-│   │   ├── inversify.config.ts   # IoC container configuration
-│   │   ├── types.ts              # Service type identifiers
-│   │   └── resolvers.ts          # Service resolution helpers
-│   ├── interfaces/               # Service contracts
-│   │   ├── user.interface.ts     # User domain interfaces
-│   │   ├── logger.interface.ts   # Logging interfaces
-│   │   └── config.interface.ts   # Configuration interfaces
-│   ├── services/                 # Service implementations
-│   │   ├── user.service.ts       # User business logic
-│   │   ├── user.repository.ts    # User data access
-│   │   ├── user-validation.service.ts # User validation
-│   │   ├── logger.service.ts     # Logging implementation
-│   │   └── config.service.ts     # Configuration service
-│   ├── lib/
-│   │   └── env.ts                # Environment configuration
-│   ├── types/
-│   │   └── base.ts               # Base type definitions
-│   ├── tests/
-│   │   ├── setup.ts              # Test configuration
-│   │   ├── utils.ts              # Test utilities
-│   │   ├── api/
-│   │   │   ├── server.test.ts    # API endpoint tests
-│   │   │   └── hono-advanced.test.ts # Advanced API tests
-│   │   └── components/
-│   │       ├── UserCard.test.ts  # Component tests
-│   │       └── UserForm.test.ts  # Form validation tests
-│   ├── app.html                  # HTML template
-│   └── app.css                   # Global styles
-├── static/                       # Static assets
-├── wrangler.toml                 # Cloudflare Workers config
-├── svelte.config.js              # SvelteKit configuration
-├── vite.config.ts                # Vite + testing configuration
-└── DEVELOPMENT.md                # Detailed development guide
+src/
+├── routes/                    # SvelteKit routes
+│   ├── +page.svelte           # Demo page
+│   └── api/[...paths]/+server.ts  # Hono API server
+├── container/                 # Dependency Injection
+│   ├── inversify.config.ts    # IoC container
+│   ├── types.ts              # Service types
+│   └── resolvers.ts          # Service resolvers
+├── interfaces/                # TypeScript interfaces
+├── services/                  # Business logic layer
+├── types/                     # Type definitions
+└── tests/                     # Test suites
+    ├── api/                   # API tests
+    └── components/            # Component tests
 ```
+
+**Key Files:**
+
+- `wrangler.toml` - Cloudflare Workers configuration
+- `svelte.config.js` - SvelteKit + adapter setup
+- `vite.config.ts` - Vite + testing configuration
 
 ## 🚀 Deployment
 
-### Cloudflare Workers Deployment
-
-1. **Login to Cloudflare**
-
-   ```bash
-   wrangler login
-   ```
-
-2. **Deploy to development**
-
-   ```bash
-   pnpm deploy
-   ```
-
-3. **Deploy to production**
-   ```bash
-   pnpm deploy:cf
-   ```
-
-### Environment Variables
-
-Configure your environment variables in:
-
-- **Local development**: `.env.local`
-- **Cloudflare Workers**: `wrangler.toml`
-
-```toml
-# wrangler.toml
-[vars]
-ENVIRONMENT = "development"
-
-[env.production.vars]
-ENVIRONMENT = "production"
-```
-
-## 🔧 Configuration
-
-### Environment Variables
+### To Cloudflare Workers
 
 ```bash
-# .env.local
-ENVIRONMENT=development
-API_BASE_URL=http://localhost:5173/api
-CF_PAGES_URL=https://localhost:8787
+# One-time setup
+wrangler login
+
+# Deploy to development
+pnpm deploy
+
+# Deploy to production
+pnpm deploy:cf
 ```
 
-### Cloudflare Workers
+### Environment Variables
 
-The application is optimized for Cloudflare Workers with:
+- **Local**: `.env.local` (SvelteKit)
+- **Production**: `wrangler.toml` (Cloudflare Workers)
 
-- **Global Edge Deployment** - Ultra-low latency worldwide
-- **Automatic HTTPS** - SSL certificates handled automatically
-- **Static Asset Optimization** - CDN-cached static files
-- **Serverless Functions** - API routes as Cloudflare Workers
+## 🔧 Architecture Highlights
+
+### Dependency Injection
+
+Using **InversifyJS** for clean architecture:
+
+- Service interfaces for contracts
+- Concrete implementations
+- IoC container for dependency resolution
+- Easy testing with mocked dependencies
+
+### Cloudflare Optimization
+
+- **Edge deployment** for ultra-low latency
+- **Automatic HTTPS** and SSL
+- **CDN-cached** static assets
+- **Serverless** API routes
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes and add tests if applicable
-4. Run the test suite: `pnpm test:run`
-5. Ensure code quality: `pnpm lint` and `pnpm check`
-6. Commit your changes (`git commit -m 'Add some amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
+1. **Fork & Clone** the repository
+2. **Install**: `pnpm install`
+3. **Create branch**: `git checkout -b feature/your-feature`
+4. **Make changes** and add tests
+5. **Quality check**: `pnpm test:run && pnpm lint && pnpm check`
+6. **Commit & Push** your changes
+7. **Open Pull Request**
 
-Please ensure all tests pass and maintain good test coverage for new features.
+Ensure all tests pass and follow the existing code patterns.
 
-## 📚 Documentation
+## 📚 Documentation & Resources
 
-- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Comprehensive development guide with testing
-- **[SvelteKit Docs](https://kit.svelte.dev/)** - SvelteKit documentation
-- **[Hono Docs](https://hono.dev/)** - Hono API framework docs
-- **[Cloudflare Workers Docs](https://developers.cloudflare.com/workers/)** - Deployment platform docs
-- **[Vitest Docs](https://vitest.dev/)** - Testing framework documentation
-- **[Testing Library](https://testing-library.com/docs/svelte-testing-library/intro/)** - Component testing utilities
+### Project Docs
+
+- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Comprehensive development guide
+
+### Tech Stack Docs
+
+- [SvelteKit](https://kit.svelte.dev/) - Frontend framework
+- [Hono](https://hono.dev/) - API framework
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/) - Deployment platform
+- [InversifyJS](https://inversify.io/) - Dependency injection
+- [Vitest](https://vitest.dev/) - Testing framework
 
 ## 🐛 Troubleshooting
 
-### Common Issues
-
-**API routes not working in production?**
+**API routes not working?**
 
 - Check `wrangler.toml` configuration
 - Ensure all HTTP methods are exported in `+server.ts`
 
-**Environment variables not accessible?**
+**Environment variables?**
 
-- Client-side vars must be prefixed with `PUBLIC_`
-- Server-side vars must be configured in `wrangler.toml`
+- Client vars: prefix with `PUBLIC_`
+- Server vars: add to `wrangler.toml`
 
 **Build errors?**
 
 - Run `pnpm check` for TypeScript validation
-- Check all imports and dependencies
+- Verify imports and dependencies
 
 **Test failures?**
 
-- Run `pnpm test:ui` for interactive debugging
-- Verify component imports and `data-testid` attributes
-- Check mock configurations in `src/tests/setup.ts`
-- Use `screen.debug()` to inspect DOM state
+- Use `pnpm test:ui` for interactive debugging
+- Check mock configurations in test setup
 
-For more troubleshooting tips, see [DEVELOPMENT.md](./DEVELOPMENT.md).
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## ⭐ Show your support
-
-Give a ⭐️ if this project helped you!
+➡️ **See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed troubleshooting**
 
 ---
 
-**Built with ❤️ using SvelteKit, Hono, and Cloudflare Workers**
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file.
+
+## ⭐ Support
+
+Give a ⭐ if this helped you!
+
+**Built with ❤️ using SvelteKit + Hono + Cloudflare Workers**
