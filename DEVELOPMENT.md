@@ -332,6 +332,364 @@ Tests are designed to run in CI environments:
   run: pnpm test:coverage
 ```
 
+## 🏗️ Dependency Injection Container
+
+This project uses **InversifyJS** to implement a clean architecture with dependency injection, following SOLID principles for maintainable, testable code.
+
+### Architecture Overview
+
+The dependency injection system is organized into several key components:
+
+- **Container** - IoC container configuration (`src/container/`)
+- **Interfaces** - Service contracts (`src/interfaces/`)
+- **Services** - Concrete implementations (`src/services/`)
+- **Resolvers** - Helper functions for service resolution
+
+### Container Configuration
+
+#### Core Files
+
+**`src/container/inversify.config.ts`** - Main container setup:
+```typescript
+import 'reflect-metadata';
+import { Container } from 'inversify';
+import { TYPES } from './types';
+
+const container = new Container();
+
+// Bind services
+container.bind<IUserService>(TYPES.UserService).to(UserService);
+container.bind<IUserRepository>(TYPES.UserRepository).to(UserRepository).inSingletonScope();
+// ... other bindings
+```
+
+**`src/container/types.ts`** - Service identifiers:
+```typescript
+export const TYPES = {
+  UserService: Symbol.for('UserService'),
+  UserRepository: Symbol.for('UserRepository'),
+  Logger: Symbol.for('Logger'),
+  // ... other types
+} as const;
+```
+
+**`src/container/resolvers.ts`** - Service resolution helpers:
+```typescript
+export const getUserService = (c: Context) => {
+  return getService<IUserService>(c, TYPES.UserService);
+};
+
+export const getLogger = (c: Context) => {
+  return getService<ILogger>(c, TYPES.Logger);
+};
+```
+
+### Service Architecture
+
+#### User Domain Services
+
+**UserService** - Business logic orchestration
+- Coordinates between repository and validation
+- Handles business rules and logging
+- Scope: Transient (new instance per request)
+
+**UserRepository** - Data access layer
+- Manages user persistence (currently in-memory)
+- Provides CRUD operations
+- Scope: Singleton (shared instance)
+
+**UserValidationService** - Input validation
+- Validates create/update requests
+- Returns structured validation results
+- Scope: Transient
+
+#### Infrastructure Services
+
+**Logger** - Structured logging
+- Context-aware logging with metadata
+- JSON-formatted output for production
+- Scope: Singleton
+
+**ConfigService** - Configuration management
+- Environment variable access
+- Safe defaults for all environments
+- Scope: Singleton
+
+### Creating New Services
+
+#### 1. Define Interface
+
+Create interface in `src/interfaces/`:
+```typescript
+// src/interfaces/email.interface.ts
+export interface IEmailService {
+  sendWelcomeEmail(email: string, name: string): Promise<void>;
+  sendNotification(email: string, message: string): Promise<void>;
+}
+```
+
+#### 2. Implement Service
+
+Create implementation in `src/services/`:
+```typescript
+// src/services/email.service.ts
+import { injectable, inject } from 'inversify';
+import type { IEmailService } from '../interfaces/email.interface';
+import type { ILogger } from '../interfaces/logger.interface';
+import { TYPES } from '../container/types';
+
+@injectable()
+export class EmailService implements IEmailService {
+  constructor(
+    @inject(TYPES.Logger) private readonly logger: ILogger
+  ) {}
+
+  async sendWelcomeEmail(email: string, name: string): Promise<void> {
+    this.logger.info('Sending welcome email', { email, name });
+    // Implementation here
+  }
+
+  async sendNotification(email: string, message: string): Promise<void> {
+    this.logger.info('Sending notification', { email });
+    // Implementation here
+  }
+}
+```
+
+#### 3. Register in Container
+
+Add to `src/container/types.ts`:
+```typescript
+export const TYPES = {
+  // ... existing types
+  EmailService: Symbol.for('EmailService'),
+} as const;
+```
+
+Add to `src/container/inversify.config.ts`:
+```typescript
+import { EmailService } from '../services/email.service';
+import type { IEmailService } from '../interfaces/email.interface';
+
+// Bind services
+container.bind<IEmailService>(TYPES.EmailService).to(EmailService);
+```
+
+#### 4. Create Resolver
+
+Add to `src/container/resolvers.ts`:
+```typescript
+export const getEmailService = (c: Context) => {
+  return getService<IEmailService>(c, TYPES.EmailService);
+};
+```
+
+#### 5. Use in API Routes
+
+```typescript
+import { getEmailService } from '../container/resolvers';
+
+app.post('/users', async (c) => {
+  const emailService = getEmailService(c);
+  const userService = getUserService(c);
+
+  const user = await userService.createUser(userData);
+  await emailService.sendWelcomeEmail(user.email, user.name);
+
+  return c.json({ success: true, data: user });
+});
+```
+
+### Testing with DI
+
+#### Mocking Services in Tests
+
+```typescript
+// tests/api/user-endpoints.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Container } from 'inversify';
+import type { IUserService } from '../../interfaces/user.interface';
+
+describe('User API with Mocked Services', () => {
+  let mockContainer: Container;
+  let mockUserService: IUserService;
+
+  beforeEach(() => {
+    // Create mock service
+    mockUserService = {
+      getAllUsers: vi.fn(),
+      getUserById: vi.fn(),
+      createUser: vi.fn(),
+      updateUser: vi.fn(),
+      deleteUser: vi.fn()
+    };
+
+    // Create test container
+    mockContainer = new Container();
+    mockContainer.bind(TYPES.UserService).toConstantValue(mockUserService);
+  });
+
+  it('should return users from service', async () => {
+    const mockUsers = [{ id: 1, name: 'Test User' }];
+    vi.mocked(mockUserService.getAllUsers).mockResolvedValue(mockUsers);
+
+    // Test implementation
+    const request = new Request('http://localhost/api/users');
+    const response = await GET({ request, c: { container: mockContainer } });
+    
+    expect(response.status).toBe(200);
+    expect(mockUserService.getAllUsers).toHaveBeenCalled();
+  });
+});
+```
+
+#### Service Unit Tests
+
+```typescript
+// tests/services/user.service.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { UserService } from '../../services/user.service';
+import type { IUserRepository, IUserValidationService } from '../../interfaces/user.interface';
+
+describe('UserService', () => {
+  let userService: UserService;
+  let mockRepository: IUserRepository;
+  let mockValidator: IUserValidationService;
+  let mockLogger: ILogger;
+
+  beforeEach(() => {
+    mockRepository = { /* mock methods */ };
+    mockValidator = { /* mock methods */ };
+    mockLogger = { /* mock methods */ };
+    
+    userService = new UserService(mockRepository, mockValidator, mockLogger);
+  });
+
+  it('should create user when validation passes', async () => {
+    // Arrange
+    const userData = { name: 'John', email: 'john@example.com' };
+    vi.mocked(mockValidator.validateCreateUser).mockReturnValue({
+      isValid: true,
+      errors: []
+    });
+    vi.mocked(mockRepository.create).mockResolvedValue({
+      id: 1,
+      ...userData,
+      createdAt: new Date()
+    });
+
+    // Act
+    const result = await userService.createUser(userData);
+
+    // Assert
+    expect(result).toHaveProperty('id', 1);
+    expect(mockValidator.validateCreateUser).toHaveBeenCalledWith(userData);
+    expect(mockRepository.create).toHaveBeenCalled();
+  });
+});
+```
+
+### Best Practices
+
+#### 1. Interface Design
+- Keep interfaces focused and cohesive
+- Use descriptive method names
+- Return appropriate types (avoid `any`)
+
+#### 2. Service Implementation
+- Use `@injectable()` decorator on all services
+- Use `@inject()` for all dependencies
+- Follow single responsibility principle
+
+#### 3. Dependency Management
+- Use constructor injection
+- Prefer interfaces over concrete types
+- Configure appropriate scopes (singleton vs transient)
+
+#### 4. Error Handling
+```typescript
+@injectable()
+export class UserService implements IUserService {
+  async createUser(userData: CreateUserRequest): Promise<User> {
+    try {
+      // Validation
+      const validation = this.validationService.validateCreateUser(userData);
+      if (!validation.isValid) {
+        const error = new Error(`Validation failed: ${validation.errors.join(', ')}`);
+        this.logger.error('User creation failed', error, { userData });
+        throw error;
+      }
+
+      // Business logic
+      const user = await this.userRepository.create(userData);
+      this.logger.info('User created successfully', { userId: user.id });
+      
+      return user;
+    } catch (error) {
+      this.logger.error('Failed to create user', error as Error, { userData });
+      throw error;
+    }
+  }
+}
+```
+
+#### 5. Configuration and Environment
+```typescript
+@injectable()
+export class ConfigService implements IConfigService {
+  getAppConfig(): IAppConfig {
+    return {
+      port: parseInt(this.getEnv('PORT', '3000')),
+      environment: this.getEnv('NODE_ENV', 'development'),
+      apiVersion: this.getEnv('API_VERSION', '1.0.0')
+    };
+  }
+
+  private getEnv(key: string, defaultValue: string): string {
+    // Safe environment variable access for edge runtimes
+    return process.env[key] ?? defaultValue;
+  }
+}
+```
+
+### Debugging DI Issues
+
+#### Common Problems
+
+1. **Service not found**
+   - Check if service is registered in container
+   - Verify TYPES symbol is correct
+   - Ensure `@injectable()` decorator is present
+
+2. **Circular dependencies**
+   - Review service dependencies
+   - Consider using factory pattern
+   - Split services into smaller units
+
+3. **Scope issues**
+   - Understand singleton vs transient scopes
+   - Use appropriate scope for service type
+   - Avoid state in transient services
+
+#### Debug Techniques
+
+```typescript
+// Add logging to container resolution
+export const getService = <T>(c: Context, serviceType: symbol): T => {
+  const diContainer = c.get('container');
+  console.log(`Resolving service: ${serviceType.toString()}`);
+  
+  try {
+    const service = diContainer.get<T>(serviceType);
+    console.log(`Service resolved successfully: ${serviceType.toString()}`);
+    return service;
+  } catch (error) {
+    console.error(`Failed to resolve service: ${serviceType.toString()}`, error);
+    throw error;
+  }
+};
+```
+
 ## 📦 Building and Deployment
 
 ### Local Preview
@@ -390,8 +748,33 @@ src/
 │   └── api/
 │       └── [...paths]/
 │           └── +server.ts     # Hono API server
+├── container/                # Dependency Injection Container
+│   ├── inversify.config.ts   # IoC container configuration
+│   ├── types.ts              # Service type identifiers  
+│   └── resolvers.ts          # Service resolution helpers
+├── interfaces/               # Service contracts
+│   ├── user.interface.ts     # User domain interfaces
+│   ├── logger.interface.ts   # Logging interfaces
+│   └── config.interface.ts   # Configuration interfaces
+├── services/                 # Service implementations
+│   ├── user.service.ts       # User business logic
+│   ├── user.repository.ts    # User data access
+│   ├── user-validation.service.ts # User validation
+│   ├── logger.service.ts     # Logging implementation
+│   └── config.service.ts     # Configuration service
 ├── lib/
 │   └── env.ts                # Environment configuration
+├── types/
+│   └── base.ts               # Base type definitions
+├── tests/
+│   ├── setup.ts              # Test configuration
+│   ├── utils.ts              # Test utilities
+│   ├── api/
+│   │   ├── server.test.ts    # API endpoint tests
+│   │   └── hono-advanced.test.ts # Advanced API tests
+│   └── components/
+│       ├── UserCard.test.ts  # Component tests
+│       └── UserForm.test.ts  # Form validation tests
 ├── app.html                  # HTML template
 └── app.css                   # Global styles
 

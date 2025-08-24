@@ -14,6 +14,8 @@ A modern, full-stack web application template combining the power of **SvelteKit
 - 🔥 **Lightning Fast** - SvelteKit for optimal performance and developer experience
 - 🌐 **Global Edge Deployment** - Cloudflare Workers for worldwide low-latency
 - 🛠️ **Type-Safe API** - Hono with full TypeScript support and validation
+- 🏗️ **Dependency Injection** - InversifyJS for clean architecture and testability
+- 🎯 **SOLID Principles** - Clean code architecture with proper separation of concerns
 - 🎨 **Modern UI** - TailwindCSS for beautiful, responsive design
 - 🔧 **Developer Experience** - Hot reload, TypeScript, ESLint, Prettier
 - 🧪 **Comprehensive Testing** - Vitest with API and component testing setup
@@ -25,11 +27,57 @@ A modern, full-stack web application template combining the power of **SvelteKit
 
 - **Frontend**: [SvelteKit](https://kit.svelte.dev/) + [Svelte 5](https://svelte.dev/)
 - **Backend**: [Hono](https://hono.dev/) API framework
+- **Dependency Injection**: [InversifyJS](https://inversify.io/) IoC container
 - **Styling**: [TailwindCSS](https://tailwindcss.com/)
 - **Testing**: [Vitest](https://vitest.dev/) + [Testing Library](https://testing-library.com/)
 - **Platform**: [Cloudflare Workers](https://workers.cloudflare.com/) + [Pages](https://pages.cloudflare.com/)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
 - **Package Manager**: [pnpm](https://pnpm.io/)
+
+## 🏗️ Dependency Injection Architecture
+
+This project implements a clean architecture using **InversifyJS** for dependency injection, following SOLID principles for maintainable and testable code.
+
+### Core Architecture Components
+
+- **Services** - Business logic layer with clear responsibilities
+- **Repositories** - Data access layer abstraction
+- **Interfaces** - Contract definitions for loose coupling
+- **Container** - IoC container for dependency resolution
+
+### Key Benefits
+
+- ✅ **Testability** - Easy mocking and unit testing
+- ✅ **Maintainability** - Loose coupling between components
+- ✅ **Extensibility** - Easy to add new implementations
+- ✅ **SOLID Principles** - Clean code architecture
+
+### Service Layer Overview
+
+| Service | Purpose | Scope |
+|---------|---------|-------|
+| `UserService` | User business logic and orchestration | Transient |
+| `UserRepository` | Data access and persistence | Singleton |
+| `UserValidationService` | Input validation and business rules | Transient |
+| `Logger` | Structured logging with context | Singleton |
+| `ConfigService` | Environment and app configuration | Singleton |
+
+### Usage Example
+
+```typescript
+// In your API routes
+import { getUserService, getLogger } from '../container/resolvers';
+
+app.get('/users', async (c) => {
+  const userService = getUserService(c);
+  const logger = getLogger(c);
+  
+  logger.info('Fetching users');
+  const users = await userService.getAllUsers();
+  
+  return c.json({ success: true, data: users });
+});
+```
 
 ## 🚀 Quick Start
 
@@ -201,12 +249,24 @@ it('should render and handle events', async () => {
 │   │   └── api/
 │   │       └── [...paths]/
 │   │           └── +server.ts     # Hono API server
+│   ├── container/                # Dependency Injection Container
+│   │   ├── inversify.config.ts   # IoC container configuration
+│   │   ├── types.ts              # Service type identifiers
+│   │   └── resolvers.ts          # Service resolution helpers
+│   ├── interfaces/               # Service contracts
+│   │   ├── user.interface.ts     # User domain interfaces
+│   │   ├── logger.interface.ts   # Logging interfaces
+│   │   └── config.interface.ts   # Configuration interfaces
+│   ├── services/                 # Service implementations
+│   │   ├── user.service.ts       # User business logic
+│   │   ├── user.repository.ts    # User data access
+│   │   ├── user-validation.service.ts # User validation
+│   │   ├── logger.service.ts     # Logging implementation
+│   │   └── config.service.ts     # Configuration service
 │   ├── lib/
 │   │   └── env.ts                # Environment configuration
-│   ├── models/
-│   │   └── user.model.ts         # TypeScript models
 │   ├── types/
-│   │   └── health.ts             # Type definitions
+│   │   └── base.ts               # Base type definitions
 │   ├── tests/
 │   │   ├── setup.ts              # Test configuration
 │   │   ├── utils.ts              # Test utilities
