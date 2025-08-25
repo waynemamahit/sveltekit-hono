@@ -237,8 +237,20 @@ Input validation is implemented with Zod v4. Schemas live in `src/models/user.mo
 import { z } from 'zod';
 
 export const createUserSchema = z.object({
-  name: z.string().trim().min(1, { message: 'Name is required' }).refine(v => v.length === 0 || v.length >= 2, { message: 'Name must be at least 2 characters long' }),
-  email: z.string().trim().min(1, { message: 'Email is required' }).refine(v => v.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), { message: 'Email format is invalid' })
+	name: z
+		.string()
+		.trim()
+		.min(1, { message: 'Name is required' })
+		.refine((v) => v.length === 0 || v.length >= 2, {
+			message: 'Name must be at least 2 characters long'
+		}),
+	email: z
+		.string()
+		.trim()
+		.min(1, { message: 'Email is required' })
+		.refine((v) => v.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), {
+			message: 'Email format is invalid'
+		})
 });
 
 export type CreateUserRequest = z.infer<typeof createUserSchema>;
@@ -250,8 +262,8 @@ Services validate using `safeParse` and throw a `ValidationError` on failure:
 // src/services/user.service.ts
 const parsed = createUserSchema.safeParse(userData);
 if (!parsed.success) {
-  const messages = parsed.error.issues.map(i => i.message);
-  throw new ValidationError(`Validation failed: ${messages.join(', ')}`);
+	const messages = parsed.error.issues.map((i) => i.message);
+	throw new ValidationError(`Validation failed: ${messages.join(', ')}`);
 }
 ```
 

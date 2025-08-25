@@ -36,13 +36,37 @@ Schemas and inferred types live in `src/models/user.model.ts`:
 import { z } from 'zod';
 
 export const createUserSchema = z.object({
-	name: z.string().trim().min(1, { message: 'Name is required' }).refine((v) => v.length === 0 || v.length >= 2, { message: 'Name must be at least 2 characters long' }),
-	email: z.string().trim().min(1, { message: 'Email is required' }).refine((v) => v.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), { message: 'Email format is invalid' })
+	name: z
+		.string()
+		.trim()
+		.min(1, { message: 'Name is required' })
+		.refine((v) => v.length === 0 || v.length >= 2, {
+			message: 'Name must be at least 2 characters long'
+		}),
+	email: z
+		.string()
+		.trim()
+		.min(1, { message: 'Email is required' })
+		.refine((v) => v.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), {
+			message: 'Email format is invalid'
+		})
 });
 
 export const updateUserSchema = z.object({
-	name: z.string().trim().min(1, { message: 'Name cannot be empty' }).min(2, { message: 'Name must be at least 2 characters long' }).optional(),
-	email: z.string().trim().min(1, { message: 'Email cannot be empty' }).refine((v) => v.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), { message: 'Email format is invalid' }).optional()
+	name: z
+		.string()
+		.trim()
+		.min(1, { message: 'Name cannot be empty' })
+		.min(2, { message: 'Name must be at least 2 characters long' })
+		.optional(),
+	email: z
+		.string()
+		.trim()
+		.min(1, { message: 'Email cannot be empty' })
+		.refine((v) => v.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), {
+			message: 'Email format is invalid'
+		})
+		.optional()
 });
 
 export type CreateUserRequest = z.infer<typeof createUserSchema>;
@@ -632,10 +656,10 @@ export const getLogger = (c: Context) => getService<ILogger>(c, TYPES.Logger);
 
 #### Domain Services
 
-| Service                 | Purpose                       | Scope     |
-| ----------------------- | ----------------------------- | --------- |
-| `UserService`           | Business logic orchestration  | Transient |
-| `UserRepository`        | Data access layer (in-memory) | Singleton |
+| Service          | Purpose                       | Scope     |
+| ---------------- | ----------------------------- | --------- |
+| `UserService`    | Business logic orchestration  | Transient |
+| `UserRepository` | Data access layer (in-memory) | Singleton |
 
 #### Infrastructure Services
 
