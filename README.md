@@ -17,6 +17,7 @@ A modern, production-ready full-stack template combining **SvelteKit**, **Hono**
 - **SOLID Principles** implementation with proper separation of concerns
 - **Custom Error Classes** with global exception handling
 - **Type-Safe APIs** with comprehensive TypeScript support
+- **Zod v4 Validation** with schemas colocated in models and inferred DTO types
 
 ### 🚀 **Modern Stack**
 
@@ -63,13 +64,12 @@ This project implements a clean architecture using **InversifyJS** for dependenc
 
 ### Service Layer Overview
 
-| Service                 | Purpose                               | Scope     |
-| ----------------------- | ------------------------------------- | --------- |
-| `UserService`           | User business logic and orchestration | Transient |
-| `UserRepository`        | Data access and persistence           | Singleton |
-| `UserValidationService` | Input validation and business rules   | Transient |
-| `Logger`                | Structured logging with context       | Singleton |
-| `ConfigService`         | Environment and app configuration     | Singleton |
+| Service          | Purpose                               | Scope     |
+| ---------------- | ------------------------------------- | --------- |
+| `UserService`    | User business logic and orchestration | Transient |
+| `UserRepository` | Data access and persistence           | Singleton |
+| `Logger`         | Structured logging with context       | Singleton |
+| `ConfigService`  | Environment and app configuration     | Singleton |
 
 ### Usage Example
 
@@ -228,23 +228,53 @@ pnpm test:coverage    # With coverage
 - **Services** - Business logic with dependency injection
 - **Error Scenarios** - Custom error classes and status codes
 
+## ✅ Validation with Zod v4
+
+Input validation is implemented with Zod v4. Schemas live in `src/models/user.model.ts` and types are inferred directly from the schemas for end-to-end type safety.
+
+```ts
+// src/models/user.model.ts
+import { z } from 'zod';
+
+export const createUserSchema = z.object({
+  name: z.string().trim().min(1, { message: 'Name is required' }).refine(v => v.length === 0 || v.length >= 2, { message: 'Name must be at least 2 characters long' }),
+  email: z.string().trim().min(1, { message: 'Email is required' }).refine(v => v.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), { message: 'Email format is invalid' })
+});
+
+export type CreateUserRequest = z.infer<typeof createUserSchema>;
+```
+
+Services validate using `safeParse` and throw a `ValidationError` on failure:
+
+```ts
+// src/services/user.service.ts
+const parsed = createUserSchema.safeParse(userData);
+if (!parsed.success) {
+  const messages = parsed.error.issues.map(i => i.message);
+  throw new ValidationError(`Validation failed: ${messages.join(', ')}`);
+}
+```
+
 ## 📝 Project Structure
 
 ```
 src/
-├── routes/                    # SvelteKit routes
-│   ├── +page.svelte           # Demo page
+├── routes/                        # SvelteKit routes
+│   ├── +page.svelte               # Demo page
 │   └── api/[...paths]/+server.ts  # Hono API server
-├── container/                 # Dependency Injection
-│   ├── inversify.config.ts    # IoC container
-│   ├── types.ts              # Service types
-│   └── resolvers.ts          # Service resolvers
-├── interfaces/                # TypeScript interfaces
-├── services/                  # Business logic layer
-├── types/                     # Type definitions
-└── tests/                     # Test suites
-    ├── api/                   # API tests
-    └── components/            # Component tests
+├── container/                     # Dependency Injection
+│   ├── inversify.config.ts        # IoC container
+│   ├── types.ts                   # Service types
+│   └── resolvers.ts               # Service resolvers
+├── models/                        # Domain models and schemas (Zod)
+│   ├── user.model.ts              # User model + Zod schemas
+│   └── error.model.ts             # Custom error classes and mapping
+├── interfaces/                    # TypeScript interfaces
+├── services/                      # Business logic layer
+├── types/                         # Type definitions
+└── tests/                         # Test suites
+    ├── api/                       # API tests
+    └── components/                # Component tests
 ```
 
 **Key Files:**

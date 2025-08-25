@@ -26,13 +26,56 @@ pnpm dev:cf       # With Cloudflare Workers simulation
 1. **SvelteKit Dev** (`pnpm dev`) - Best for UI development, fastest reload
 2. **Cloudflare Simulation** (`pnpm dev:cf`) - Test Workers environment locally
 
+## ✅ Validation with Zod v4
+
+All request DTOs are validated using Zod v4 with schemas colocated in the model layer. Types are inferred from schemas to ensure consistency between runtime validation and TypeScript types.
+
+Schemas and inferred types live in `src/models/user.model.ts`:
+
+```ts
+import { z } from 'zod';
+
+export const createUserSchema = z.object({
+	name: z.string().trim().min(1, { message: 'Name is required' }).refine((v) => v.length === 0 || v.length >= 2, { message: 'Name must be at least 2 characters long' }),
+	email: z.string().trim().min(1, { message: 'Email is required' }).refine((v) => v.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), { message: 'Email format is invalid' })
+});
+
+export const updateUserSchema = z.object({
+	name: z.string().trim().min(1, { message: 'Name cannot be empty' }).min(2, { message: 'Name must be at least 2 characters long' }).optional(),
+	email: z.string().trim().min(1, { message: 'Email cannot be empty' }).refine((v) => v.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), { message: 'Email format is invalid' }).optional()
+});
+
+export type CreateUserRequest = z.infer<typeof createUserSchema>;
+export type UpdateUserRequest = z.infer<typeof updateUserSchema>;
+```
+
+Services use `safeParse` and throw typed errors on failure:
+
+```ts
+const result = createUserSchema.safeParse(userData);
+if (!result.success) {
+	const messages = result.error.issues.map((i) => i.message);
+	throw new ValidationError(`Validation failed: ${messages.join(', ')}`);
+}
+```
+
+Interfaces alias DTOs to the inferred types for consistency across layers:
+
+```ts
+// src/interfaces/user.interface.ts
+export type CreateUserRequest = CreateUserRequestModel;
+export type UpdateUserRequest = UpdateUserRequestModel;
+```
+
+Note: The previous `UserValidationService` has been removed; validation now happens directly in services using Zod schemas.
+
 ## ⚠️ Global Exception Handling
 
 Comprehensive error handling system with custom error classes, global middleware, and structured logging.
 
 ### Architecture Components
 
-- **Custom Error Classes** (`src/types/errors.ts`) - Typed error definitions
+- **Custom Error Classes** (`src/models/error.model.ts`) - Typed error definitions
 - **Global Error Handler** (Hono `onError` middleware) - Centralized exception handling
 - **Structured Logging** - Contextual error logging with appropriate log levels
 - **Consistent Responses** - Standardized JSON error format
@@ -42,7 +85,7 @@ Comprehensive error handling system with custom error classes, global middleware
 Type-safe error handling with automatic HTTP status mapping:
 
 ```typescript
-// Available error classes (src/types/errors.ts)
+// Available error classes (src/models/error.model.ts)
 ValidationError     → HTTP 400
 BadRequestError     → HTTP 400
 UnauthorizedError   → HTTP 401
@@ -109,17 +152,18 @@ export class UserService {
 	async getUserById(id: number): Promise<User | null> {
 		const user = await this.userRepository.findById(id);
 		if (!user) {
-			throw new NotFoundError('User not found'); // Auto-handled by global middleware
+			throw new NotFoundError('User not found');
 		}
 		return user;
 	}
 
 	async createUser(userData: CreateUserRequest): Promise<User> {
-		const validation = this.validationService.validateCreateUser(userData);
-		if (!validation.isValid) {
-			throw new ValidationError(`Validation failed: ${validation.errors.join(', ')}`);
+		const parsed = createUserSchema.safeParse(userData);
+		if (!parsed.success) {
+			const errors = parsed.error.issues.map((i) => i.message);
+			throw new ValidationError(`Validation failed: ${errors.join(', ')}`);
 		}
-		return await this.userRepository.create(userData);
+		return await this.userRepository.create({ ...userData, createdAt: new Date() });
 	}
 }
 ```
@@ -193,25 +237,12 @@ describe('Error Handling', () => {
 // tests/services/user.service.test.ts
 import { describe, expect, it } from 'vitest';
 import { UserService } from '../../services/user.service';
-import { BadRequestError, NotFoundError } from '../../types/errors';
+import { BadRequestError, NotFoundError } from '../../models/error.model';
 
-describe('UserService Error Handling', () => {
-	it('should throw BadRequestError for invalid ID', () => {
-		const userService = new UserService(mockRepository, mockValidator, mockLogger);
-
-		expect(() => userService.getUserById(-1)).toThrow(BadRequestError);
-		expect(() => userService.getUserById(-1)).toThrow('Invalid user ID');
-	});
-
-	it('should throw NotFoundError when user does not exist', async () => {
-		mockRepository.findById.mockResolvedValue(null);
-
-		const userService = new UserService(mockRepository, mockValidator, mockLogger);
-
-		await expect(userService.getUserById(999)).rejects.toThrow(NotFoundError);
-		await expect(userService.getUserById(999)).rejects.toThrow('User not found');
-	});
-});
+// Example sketch; adapt to your mocks
+expect(async () => {
+	await new UserService(/* ... */).getUserById(-1);
+}).rejects.toThrow(BadRequestError);
 ```
 
 ### Best Practices
@@ -229,7 +260,7 @@ To add a new error type:
 1. **Define the Error Class:**
 
 ```typescript
-// src/types/errors.ts
+// src/models/error.model.ts
 export class RateLimitError extends Error {
 	constructor(message: string) {
 		super(message);
@@ -500,6 +531,7 @@ beforeEach(() => {
    ```
 
 5. **Wait for async operations**:
+
    ```typescript
    await fireEvent.click(button);
    await tick(); // For Svelte reactivity
@@ -542,6 +574,7 @@ After running `pnpm test:coverage`, view the coverage report:
    ```
 
 4. **Use Vitest UI** for interactive debugging:
+
    ```bash
    pnpm test:ui
    ```
@@ -603,7 +636,6 @@ export const getLogger = (c: Context) => getService<ILogger>(c, TYPES.Logger);
 | ----------------------- | ----------------------------- | --------- |
 | `UserService`           | Business logic orchestration  | Transient |
 | `UserRepository`        | Data access layer (in-memory) | Singleton |
-| `UserValidationService` | Input validation              | Transient |
 
 #### Infrastructure Services
 
