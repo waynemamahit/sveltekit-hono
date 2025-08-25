@@ -1,5 +1,5 @@
 import { injectable } from 'inversify';
-import type { IConfigService, IAppConfig, IDatabaseConfig } from '../interfaces/config.interface';
+import type { IAppConfig, IConfigService, IDatabaseConfig } from '../interfaces/config.interface';
 
 // Single Responsibility Principle - Only handles configuration
 @injectable()

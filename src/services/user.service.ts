@@ -1,22 +1,21 @@
-import { injectable, inject } from 'inversify';
-import type {
-	IUserService,
-	IUserRepository,
-	IUserValidationService,
-	User,
-	CreateUserRequest,
-	UpdateUserRequest
-} from '../interfaces/user.interface';
-import type { ILogger } from '../interfaces/logger.interface';
+import { inject, injectable } from 'inversify';
 import { TYPES } from '../container/types';
-import { ValidationError } from '../types/errors';
+import type { ILogger } from '../interfaces/logger.interface';
+import type {
+	CreateUserRequest,
+	IUserRepository,
+	IUserService,
+	UpdateUserRequest,
+	User
+} from '../interfaces/user.interface';
+import { ValidationError } from '../models/error.model';
+import { createUserSchema, updateUserSchema } from '../models/user.model';
 
 // Dependency Inversion Principle - Depends on abstractions, not concretions
 @injectable()
 export class UserService implements IUserService {
 	constructor(
 		@inject(TYPES.UserRepository) private readonly userRepository: IUserRepository,
-		@inject(TYPES.UserValidationService) private readonly validationService: IUserValidationService,
 		@inject(TYPES.Logger) private readonly logger: ILogger
 	) {}
 
@@ -40,10 +39,11 @@ export class UserService implements IUserService {
 	async createUser(userData: CreateUserRequest): Promise<User> {
 		this.logger.info('Creating new user', { email: userData.email });
 
-		// Validation
-		const validation = this.validationService.validateCreateUser(userData);
-		if (!validation.isValid) {
-			const error = new ValidationError(`Validation failed: ${validation.errors.join(', ')}`);
+		// Validation (Zod)
+		const createParsed = createUserSchema.safeParse(userData);
+		if (!createParsed.success) {
+			const errors = createParsed.error.issues.map((i) => i.message);
+			const error = new ValidationError(`Validation failed: ${errors.join(', ')}`);
 			this.logger.error('User creation failed - validation error', error);
 			throw error;
 		}
@@ -68,10 +68,11 @@ export class UserService implements IUserService {
 			return null;
 		}
 
-		// Validation
-		const validation = this.validationService.validateUpdateUser(userData);
-		if (!validation.isValid) {
-			const error = new ValidationError(`Validation failed: ${validation.errors.join(', ')}`);
+		// Validation (Zod)
+		const updateParsed = updateUserSchema.safeParse(userData);
+		if (!updateParsed.success) {
+			const errors = updateParsed.error.issues.map((i) => i.message);
+			const error = new ValidationError(`Validation failed: ${errors.join(', ')}`);
 			this.logger.error('User update failed - validation error', error);
 			throw error;
 		}

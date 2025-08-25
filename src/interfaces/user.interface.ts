@@ -15,12 +15,14 @@ export interface IUserService {
 	deleteUser(id: number): Promise<boolean>;
 }
 
-export interface IUserValidationService {
-	validateCreateUser(userData: CreateUserRequest): ValidationResult;
-	validateUpdateUser(userData: UpdateUserRequest): ValidationResult;
-}
+// Validation moved to Zod schemas; legacy interface removed
 
 // DTOs for better type safety
+import type {
+	CreateUserRequest as CreateUserRequestModel,
+	UpdateUserRequest as UpdateUserRequestModel
+} from '../models/user.model';
+
 export interface User {
 	id: number;
 	name: string;
@@ -28,15 +30,9 @@ export interface User {
 	createdAt: Date;
 }
 
-export interface CreateUserRequest {
-	name: string;
-	email: string;
-}
-
-export interface UpdateUserRequest {
-	name?: string;
-	email?: string;
-}
+// Alias DTOs to schema-inferred types for consistency across layers
+export type CreateUserRequest = CreateUserRequestModel;
+export type UpdateUserRequest = UpdateUserRequestModel;
 
 export interface ValidationResult {
 	isValid: boolean;

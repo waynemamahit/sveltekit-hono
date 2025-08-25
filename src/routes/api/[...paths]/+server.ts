@@ -7,7 +7,12 @@ import { logger } from 'hono/logger';
 import 'reflect-metadata';
 import { container } from '../../../container/inversify.config';
 import { getLogger, getUserService } from '../../../container/resolvers';
-import { BadRequestError, errorNames, NotFoundError, ValidationError } from '../../../types/errors';
+import {
+	BadRequestError,
+	errorNames,
+	NotFoundError,
+	ValidationError
+} from '../../../models/error.model';
 import type { HealthStatus } from '../../../types/health';
 
 interface ApiResponse<T = unknown> {
