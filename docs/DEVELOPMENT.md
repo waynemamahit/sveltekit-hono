@@ -1375,6 +1375,75 @@ In addition to server-side DI, this project implements a comprehensive client-si
 └─────────────────────────────────────────┘
 ```
 
+### DI Directory Structure
+
+The dependency injection system is organized across multiple directories:
+
+```
+src/
+├── container/
+│   ├── client/
+│   │   └── inversify.config.client.ts  # Client-side DI container
+│   ├── inversify.config.ts             # Server-side DI container
+│   ├── types.ts                        # Service type identifiers
+│   └── resolvers.ts                    # Server-side service resolvers
+├── interfaces/
+│   ├── api.interface.ts                # API service interfaces
+│   ├── http-client.interface.ts        # HTTP client interface
+│   ├── user.interface.ts               # User domain interfaces
+│   ├── logger.interface.ts             # Logging interfaces
+│   └── config.interface.ts             # Configuration interfaces
+├── services/
+│   ├── client/
+│   │   ├── http-client.service.ts      # HTTP client implementation
+│   │   └── api.service.ts              # API service implementations
+│   ├── user.service.ts                 # Server-side user service
+│   ├── user.repository.ts              # User data access
+│   ├── user-validation.service.ts      # User validation
+│   ├── logger.service.ts               # Logging implementation
+│   └── config.service.ts               # Configuration service
+└── lib/
+    └── di/
+        ├── context.svelte.ts           # Svelte DI context utilities
+        └── README.md                   # DI quick reference
+```
+
+**Key Directories:**
+
+- **`container/`** - IoC container configurations
+  - `inversify.config.ts` - Server-side container (for Hono routes)
+  - `client/inversify.config.client.ts` - Client-side container (for Svelte components)
+  - `types.ts` - Symbol identifiers for all services
+  - `resolvers.ts` - Helper functions for server-side service resolution
+
+- **`interfaces/`** - Service contracts and type definitions
+  - All services implement interfaces for better testability
+  - Separates contract from implementation
+
+- **`services/`** - Service implementations
+  - `client/` - Browser-only services (API clients, HTTP client)
+  - Root level - Server-side services (business logic, data access)
+
+- **`lib/di/`** - DI utilities for Svelte components
+  - `context.svelte.ts` - Hooks and context management
+  - `README.md` - Quick reference guide
+
+**Container Separation:**
+
+This project maintains **two separate containers** to ensure proper environment isolation:
+
+1. **Server-side Container** (`container/inversify.config.ts`)
+   - Used by Hono API routes
+   - Contains database repositories, business logic services, validators
+   - Not accessible from browser
+   - Includes server-only dependencies
+
+2. **Client-side Container** (`container/client/inversify.config.client.ts`)
+   - Used by Svelte components in the browser
+   - Contains HTTP clients, API service wrappers
+   - No server-side dependencies
+   - Optimized for browser bundle size
+
 ### Quick Start
 
 #### 1. Using Services in Components
@@ -1544,6 +1613,148 @@ Best for self-contained reusable components:
 </script>
 
 <!-- Component renders its own data -->
+```
+
+### Complete API Reference
+
+#### DI Context Initialization
+
+##### `initializeDI(container?: Container): void`
+
+Initialize the DI container in Svelte context. **Must be called in root layout before any components use services.**
+
+```typescript
+import { initializeDI } from '$lib/di/context.svelte';
+
+// Use default client container
+initializeDI();
+
+// Or provide custom container (for testing)
+import { Container } from 'inversify';
+const testContainer = new Container();
+initializeDI(testContainer);
+```
+
+**Where to call:**
+
+```svelte
+<!-- src/routes/+layout.svelte -->
+<script lang="ts">
+	import { initializeDI } from '$lib/di/context.svelte';
+
+	// Initialize once at the root
+	initializeDI();
+</script>
+
+<slot />
+```
+
+#### Service Hook Functions
+
+##### `useUserApi(): IUserApiService`
+
+Inject the User API service for user CRUD operations.
+
+```typescript
+const userApi = useUserApi();
+
+// Available methods:
+await userApi.getAllUsers(); // Get all users
+await userApi.getUserById(id); // Get user by ID
+await userApi.createUser({ name, email }); // Create new user
+await userApi.updateUser(id, data); // Update user
+await userApi.deleteUser(id); // Delete user
+```
+
+##### `useHealthApi(): IHealthApiService`
+
+Inject the Health API service for system health checks.
+
+```typescript
+const healthApi = useHealthApi();
+
+// Available methods:
+const status = await healthApi.checkHealth();
+// Returns: { status: 'ok', timestamp: string }
+```
+
+##### `useHelloApi(): IHelloApiService`
+
+Inject the Hello API service.
+
+```typescript
+const helloApi = useHelloApi();
+
+// Available methods:
+const response = await helloApi.getHello();
+// Returns: { message: string }
+```
+
+##### `useApi(): IApiService`
+
+Inject the combined API service facade. Use when component needs multiple services.
+
+```typescript
+const api = useApi();
+
+// Access all services through one object:
+api.users.getAllUsers();
+api.health.checkHealth();
+api.hello.getHello();
+```
+
+##### `useHttpClient(): IHttpClient`
+
+Inject the HTTP client directly for custom API calls (advanced usage).
+
+```typescript
+const httpClient = useHttpClient();
+
+// Available methods:
+await httpClient.get<T>(url, config);
+await httpClient.post<T>(url, data, config);
+await httpClient.put<T>(url, data, config);
+await httpClient.patch<T>(url, data, config);
+await httpClient.delete<T>(url, config);
+```
+
+#### Low-Level API
+
+##### `getContainer(): Container`
+
+Get the raw DI container from Svelte context.
+
+```typescript
+import { getContainer } from '$lib/di/context.svelte';
+
+const container = getContainer();
+const service = container.get(TYPES.SomeService);
+```
+
+##### `getService<T>(serviceType: symbol): T`
+
+Get a service by its type identifier.
+
+```typescript
+import { getService } from '$lib/di/context.svelte';
+import { TYPES } from '$container/types';
+
+const userApi = getService<IUserApiService>(TYPES.UserApiService);
+```
+
+##### `createServiceHook<T>(serviceType: symbol): () => T`
+
+Create a custom service hook for new services.
+
+```typescript
+import { createServiceHook } from '$lib/di/context.svelte';
+import { TYPES } from '$container/types';
+
+// Create custom hook
+export const useNotifications = createServiceHook<INotificationService>(TYPES.NotificationService);
+
+// Use in component
+const notifications = useNotifications();
 ```
 
 ### API Methods Reference
@@ -1922,6 +2133,71 @@ The example page includes:
 | **Initialization** | Per request (Hono middleware)       | Once at app root (`+layout.svelte`)               |
 | **Resolution**     | `getService(c, TYPES.Service)`      | `useService()` hooks                              |
 | **Environment**    | Edge/Node.js                        | Browser                                           |
+
+### Contributing to DI System
+
+When adding new services to the DI system, follow these steps:
+
+#### For Client-Side Services:
+
+1. **Create interface** in `src/interfaces/`
+2. **Implement service** in `src/services/client/`
+3. **Add type identifier** to `src/container/types.ts`
+4. **Register in container** at `src/container/client/inversify.config.client.ts`
+5. **Create service hook** in `src/lib/di/context.svelte.ts`
+6. **Add tests** with mocks
+7. **Update documentation** in this guide
+
+#### For Server-Side Services:
+
+1. **Create interface** in `src/interfaces/`
+2. **Implement service** in `src/services/`
+3. **Add type identifier** to `src/container/types.ts`
+4. **Register in container** at `src/container/inversify.config.ts`
+5. **Create resolver** in `src/container/resolvers.ts`
+6. **Add tests** with dependency injection
+7. **Update documentation** in this guide
+
+#### Checklist for New Services:
+
+- [ ] Interface defined with clear method signatures
+- [ ] Service implements interface completely
+- [ ] Service decorated with `@injectable()`
+- [ ] Dependencies injected via constructor with `@inject()`
+- [ ] Type identifier added to `TYPES` object
+- [ ] Container binding configured with appropriate scope
+- [ ] Hook or resolver function created
+- [ ] Unit tests written with mocked dependencies
+- [ ] Integration tests cover main use cases
+- [ ] Documentation updated with examples
+- [ ] Type exports added to relevant files
+
+### DI Resources
+
+**Official Documentation:**
+
+- [InversifyJS Documentation](https://inversify.io/) - IoC container library
+- [SvelteKit Documentation](https://kit.svelte.dev/) - Framework documentation
+- [Svelte 5 Runes](https://svelte.dev/docs/svelte/what-are-runes) - Reactivity system
+
+**Design Patterns:**
+
+- [SOLID Principles](https://en.wikipedia.org/wiki/SOLID) - Object-oriented design
+- [Dependency Injection Pattern](https://en.wikipedia.org/wiki/Dependency_injection) - DI fundamentals
+- [Repository Pattern](https://martinfowler.com/eaaCatalog/repository.html) - Data access layer
+- [Service Layer Pattern](https://martinfowler.com/eaaCatalog/serviceLayer.html) - Business logic organization
+
+**Testing Resources:**
+
+- [Vitest Documentation](https://vitest.dev/) - Test framework
+- [Testing Library](https://testing-library.com/docs/svelte-testing-library/intro/) - Component testing
+- [Mock Service Worker](https://mswjs.io/) - API mocking
+
+**Project-Specific Files:**
+
+- `src/lib/di/README.md` - Quick reference guide
+- `src/container/types.ts` - All service identifiers
+- `src/lib/di/context.svelte.ts` - Client-side DI implementation
 
 ## 📦 Building and Deployment
 

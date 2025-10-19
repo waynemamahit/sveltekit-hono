@@ -115,8 +115,8 @@ Use dependency injection in your Svelte components for clean, testable code:
 
 **📚 Learn More:**
 
-- [Complete DI Guide](./DEVELOPMENT.md#-client-side-dependency-injection-svelte-components) - Quick start and full documentation
-- [Server-Side DI](./DEVELOPMENT.md#-dependency-injection-architecture) - API routes DI guide
+- [Complete DI Guide](./docs/DEVELOPMENT.md#-client-side-dependency-injection-svelte-components) - Quick start and full documentation
+- [Server-Side DI](./docs/DEVELOPMENT.md#-dependency-injection-architecture) - API routes DI guide
 - [Live Examples](http://localhost:5173/di-example) - See DI in action
 - [DI Testing Guide](./TESTING.md) - Complete testing patterns and examples
 
@@ -409,7 +409,7 @@ Ensure all tests pass and follow the existing code patterns.
 
 ### Project Docs
 
-- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Comprehensive development guide
+- **[DEVELOPMENT.md](./docs/DEVELOPMENT.md)** - Comprehensive development guide
 - **[TESTING.md](./TESTING.md)** - Complete testing guide and best practices
 
 ### Tech Stack Docs
@@ -442,7 +442,7 @@ Ensure all tests pass and follow the existing code patterns.
 - Use `pnpm test:ui` for interactive debugging
 - Check mock configurations in test setup
 
-➡️ **See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed troubleshooting**
+➡️ **See [DEVELOPMENT.md](./docs/DEVELOPMENT.md) for detailed troubleshooting**
 
 ---
 
