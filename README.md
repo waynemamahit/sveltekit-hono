@@ -46,14 +46,7 @@ A modern, production-ready full-stack template combining **SvelteKit**, **Hono**
 
 ## 🏗️ Dependency Injection Architecture
 
-This project implements a clean architecture using **InversifyJS** for dependency injection, following SOLID principles for maintainable and testable code.
-
-### Core Architecture Components
-
-- **Services** - Business logic layer with clear responsibilities
-- **Repositories** - Data access layer abstraction
-- **Interfaces** - Contract definitions for loose coupling
-- **Container** - IoC container for dependency resolution
+This project implements a comprehensive **InversifyJS** dependency injection system for both server-side and client-side code, following SOLID principles for maintainable and testable code.
 
 ### Key Benefits
 
@@ -61,8 +54,73 @@ This project implements a clean architecture using **InversifyJS** for dependenc
 - ✅ **Maintainability** - Loose coupling between components
 - ✅ **Extensibility** - Easy to add new implementations
 - ✅ **SOLID Principles** - Clean code architecture
+- ✅ **Type Safety** - Full TypeScript support with compile-time checking
 
-### Service Layer Overview
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────┐
+│          Svelte Components (Browser)            │
+│  Use service hooks: useUserApi(), useApi()      │
+└────────────────┬────────────────────────────────┘
+                 │ resolves from
+                 ↓
+┌─────────────────────────────────────────────────┐
+│         Client-Side DI Container                │
+│    (API services, HTTP client)                  │
+└────────────────┬────────────────────────────────┘
+                 │ calls
+                 ↓
+┌─────────────────────────────────────────────────┐
+│           Hono API Routes (Edge)                │
+└────────────────┬────────────────────────────────┘
+                 │ resolves from
+                 ↓
+┌─────────────────────────────────────────────────┐
+│         Server-Side DI Container                │
+│  (Business logic, repositories, logging)        │
+└─────────────────────────────────────────────────┘
+```
+
+### Client-Side DI (Svelte Components)
+
+Use dependency injection in your Svelte components for clean, testable code:
+
+```svelte
+<script lang="ts">
+	import { useUserApi } from '$lib/di/context.svelte';
+	import { onMount } from 'svelte';
+
+	// Inject the User API service
+	const userApi = useUserApi();
+	let users = $state([]);
+
+	onMount(async () => {
+		users = await userApi.getAllUsers();
+	});
+
+	const createUser = async (name: string, email: string) => {
+		const newUser = await userApi.createUser({ name, email });
+		users = [...users, newUser];
+	};
+</script>
+```
+
+**Available Service Hooks:**
+
+- `useUserApi()` - User CRUD operations
+- `useHealthApi()` - Health check operations
+- `useHelloApi()` - Hello endpoint operations
+- `useApi()` - Combined facade for all services
+
+**📚 Learn More:**
+
+- [Complete DI Guide](./DEVELOPMENT.md#-client-side-dependency-injection-svelte-components) - Quick start and full documentation
+- [Server-Side DI](./DEVELOPMENT.md#-dependency-injection-architecture) - API routes DI guide
+- [Live Examples](http://localhost:5173/di-example) - See DI in action
+- [DI Testing Guide](./TESTING.md) - Complete testing patterns and examples
+
+### Server-Side DI (API Routes)
 
 | Service          | Purpose                               | Scope     |
 | ---------------- | ------------------------------------- | --------- |
@@ -70,8 +128,6 @@ This project implements a clean architecture using **InversifyJS** for dependenc
 | `UserRepository` | Data access and persistence           | Singleton |
 | `Logger`         | Structured logging with context       | Singleton |
 | `ConfigService`  | Environment and app configuration     | Singleton |
-
-### Usage Example
 
 ```typescript
 // In your API routes
@@ -213,6 +269,10 @@ curl -X POST http://localhost:5173/api/users \
 
 Comprehensive test suite with **Vitest** + **Testing Library**:
 
+> 📘 **For complete testing guide, see [TESTING.md](./TESTING.md)**
+>
+> Includes: testing strategies, patterns, DI testing, mocking, coverage, and CI/CD setup
+
 ```bash
 # Run tests
 pnpm test:run          # All tests once
@@ -350,6 +410,7 @@ Ensure all tests pass and follow the existing code patterns.
 ### Project Docs
 
 - **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Comprehensive development guide
+- **[TESTING.md](./TESTING.md)** - Complete testing guide and best practices
 
 ### Tech Stack Docs
 

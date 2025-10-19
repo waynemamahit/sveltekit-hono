@@ -1,17 +1,40 @@
 <script lang="ts">
+	import { useUserApi } from '$lib/di/context.svelte';
 	import type { User } from '../../models/user.model';
 
 	interface Props {
 		user: User;
 		onDelete?: (id: number) => void;
 		readonly?: boolean;
+		useDI?: boolean; // Optional: use DI for delete operation
 	}
 
-	let { user, onDelete, readonly = false }: Props = $props();
+	let { user, onDelete, readonly = false, useDI = false }: Props = $props();
 
-	const handleDelete = () => {
-		if (onDelete && !readonly) {
-			onDelete(user.id);
+	// Optionally inject API service if useDI is enabled
+	const userApi = useDI ? useUserApi() : null;
+
+	let isDeleting = $state(false);
+
+	const handleDelete = async () => {
+		if (readonly || isDeleting) return;
+
+		isDeleting = true;
+		try {
+			// Use DI if enabled, otherwise use callback
+			if (useDI && userApi) {
+				await userApi.deleteUser(user.id);
+				// Notify parent through callback if provided
+				if (onDelete) {
+					onDelete(user.id);
+				}
+			} else if (onDelete) {
+				await onDelete(user.id);
+			}
+		} catch (error) {
+			console.error('Failed to delete user:', error);
+		} finally {
+			isDeleting = false;
 		}
 	};
 </script>
@@ -31,13 +54,14 @@
 			</p>
 		</div>
 
-		{#if !readonly && onDelete}
+		{#if !readonly && (onDelete || useDI)}
 			<button
 				onclick={handleDelete}
-				class="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 transition-colors hover:bg-red-200"
+				disabled={isDeleting}
+				class="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 transition-colors hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50"
 				data-testid="delete-button"
 			>
-				Delete
+				{isDeleting ? 'Deleting...' : 'Delete'}
 			</button>
 		{/if}
 	</div>

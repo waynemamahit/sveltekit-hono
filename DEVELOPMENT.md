@@ -361,6 +361,16 @@ All API routes are handled by the Hono server in `src/routes/api/[...paths]/+ser
 
 This project includes comprehensive testing for both Hono API endpoints and Svelte components using Vitest and Testing Library.
 
+> 📘 **For comprehensive testing guide, patterns, and examples, see [TESTING.md](./TESTING.md)**
+>
+> The TESTING.md guide includes:
+>
+> - Complete testing strategies and conventions
+> - Unit, integration, and component testing examples
+> - Testing with Dependency Injection patterns
+> - Mocking strategies and best practices
+> - Coverage reports and CI/CD setup
+
 ### Running Tests
 
 ```bash
@@ -851,6 +861,374 @@ describe('UserService', () => {
 });
 ```
 
+#### Comprehensive Testing Patterns
+
+##### Testing API Services with Mocks
+
+```typescript
+// tests/services/user-api.service.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { UserApiService } from '../../services/client/api.service';
+import type { IHttpClient } from '../../interfaces/http-client.interface';
+
+describe('UserApiService', () => {
+	let userApiService: UserApiService;
+	let mockHttpClient: IHttpClient;
+
+	beforeEach(() => {
+		// Create mock HTTP client
+		mockHttpClient = {
+			get: vi.fn(),
+			post: vi.fn(),
+			put: vi.fn(),
+			patch: vi.fn(),
+			delete: vi.fn()
+		};
+
+		// Create service with mock
+		userApiService = new UserApiService(mockHttpClient);
+	});
+
+	it('should fetch all users', async () => {
+		const mockUsers = [
+			{ id: 1, name: 'John', email: 'john@example.com' },
+			{ id: 2, name: 'Jane', email: 'jane@example.com' }
+		];
+
+		vi.mocked(mockHttpClient.get).mockResolvedValue({
+			data: mockUsers
+		});
+
+		const result = await userApiService.getAllUsers();
+
+		expect(result).toEqual(mockUsers);
+		expect(mockHttpClient.get).toHaveBeenCalledWith('/api/users');
+	});
+
+	it('should create a user', async () => {
+		const userData = { name: 'Bob', email: 'bob@example.com' };
+		const mockResponse = { data: { id: 3, ...userData } };
+
+		vi.mocked(mockHttpClient.post).mockResolvedValue(mockResponse);
+
+		const result = await userApiService.createUser(userData);
+
+		expect(result).toEqual({ id: 3, ...userData });
+		expect(mockHttpClient.post).toHaveBeenCalledWith('/api/users', userData);
+	});
+
+	it('should throw error when create fails', async () => {
+		vi.mocked(mockHttpClient.post).mockResolvedValue({ data: null });
+
+		await expect(
+			userApiService.createUser({ name: 'Test', email: 'test@example.com' })
+		).rejects.toThrow('Failed to create user');
+	});
+
+	it('should delete a user', async () => {
+		vi.mocked(mockHttpClient.delete).mockResolvedValue({});
+
+		await userApiService.deleteUser(1);
+
+		expect(mockHttpClient.delete).toHaveBeenCalledWith('/api/users/1');
+	});
+});
+```
+
+##### Using Mock Factory Functions
+
+```typescript
+// tests/components/user-operations.test.ts
+import { describe, it, expect, vi } from 'vitest';
+import { createMockUserApi } from '../mocks/api.mock';
+
+describe('User Operations with Mocks', () => {
+	it('should use default mock behavior', async () => {
+		const mockApi = createMockUserApi();
+
+		const users = await mockApi.getAllUsers();
+
+		expect(users).toHaveLength(3);
+		expect(users[0].name).toBe('John Doe');
+	});
+
+	it('should override specific methods', async () => {
+		const mockApi = createMockUserApi({
+			getAllUsers: vi
+				.fn()
+				.mockResolvedValue([{ id: 999, name: 'Custom User', email: 'custom@example.com' }])
+		});
+
+		const users = await mockApi.getAllUsers();
+
+		expect(users).toHaveLength(1);
+		expect(users[0].name).toBe('Custom User');
+	});
+
+	it('should simulate API errors', async () => {
+		const mockApi = createMockUserApi({
+			createUser: vi.fn().mockRejectedValue(new Error('Network error'))
+		});
+
+		await expect(mockApi.createUser({ name: 'Test', email: 'test@example.com' })).rejects.toThrow(
+			'Network error'
+		);
+	});
+
+	it('should track method calls', async () => {
+		const getAllUsersMock = vi.fn().mockResolvedValue([]);
+		const mockApi = createMockUserApi({
+			getAllUsers: getAllUsersMock
+		});
+
+		await mockApi.getAllUsers();
+		await mockApi.getAllUsers();
+
+		expect(getAllUsersMock).toHaveBeenCalledTimes(2);
+	});
+});
+```
+
+##### Integration Testing with Test Containers
+
+```typescript
+// tests/integration/user-workflow.test.ts
+import { describe, it, expect, beforeEach } from 'vitest';
+import { Container } from 'inversify';
+import { TYPES } from '../../container/types';
+import { MockUserApiService } from '../mocks/api.mock';
+import type { IUserApiService } from '../../interfaces/api.interface';
+
+describe('User Workflow Integration Test', () => {
+	let testContainer: Container;
+	let userApi: IUserApiService;
+
+	beforeEach(() => {
+		// Create fresh container for each test
+		testContainer = new Container();
+
+		// Bind mock service
+		const mockService = new MockUserApiService();
+		testContainer.bind<IUserApiService>(TYPES.UserApiService).toConstantValue(mockService);
+
+		// Resolve service
+		userApi = testContainer.get<IUserApiService>(TYPES.UserApiService);
+	});
+
+	it('should complete full user lifecycle', async () => {
+		// Create user
+		const newUser = await userApi.createUser({
+			name: 'Integration Test User',
+			email: 'integration@example.com'
+		});
+		expect(newUser).toHaveProperty('id');
+
+		// Fetch all users
+		let users = await userApi.getAllUsers();
+		expect(users).toContainEqual(
+			expect.objectContaining({
+				name: 'Integration Test User'
+			})
+		);
+
+		// Update user
+		const updated = await userApi.updateUser(newUser.id, {
+			name: 'Updated Name'
+		});
+		expect(updated.name).toBe('Updated Name');
+
+		// Delete user
+		await userApi.deleteUser(newUser.id);
+		users = await userApi.getAllUsers();
+		expect(users).not.toContainEqual(
+			expect.objectContaining({
+				id: newUser.id
+			})
+		);
+	});
+
+	it('should handle concurrent operations', async () => {
+		const operations = [
+			userApi.createUser({ name: 'User 1', email: 'user1@example.com' }),
+			userApi.createUser({ name: 'User 2', email: 'user2@example.com' }),
+			userApi.createUser({ name: 'User 3', email: 'user3@example.com' })
+		];
+
+		const results = await Promise.all(operations);
+
+		expect(results).toHaveLength(3);
+		results.forEach((user) => {
+			expect(user).toHaveProperty('id');
+			expect(user).toHaveProperty('name');
+		});
+	});
+});
+```
+
+#### Testing Best Practices for DI
+
+##### 1. Isolate Tests with Fresh Containers
+
+```typescript
+describe('Service Tests', () => {
+	let container: Container;
+
+	beforeEach(() => {
+		// Create new container for each test
+		container = new Container();
+		// Bind services...
+	});
+
+	afterEach(() => {
+		// Clean up if needed
+		container.unbindAll();
+	});
+});
+```
+
+##### 2. Use Descriptive Mock Names
+
+```typescript
+// ✅ Good
+const mockUserApiWithError = createMockUserApi({
+	getAllUsers: vi.fn().mockRejectedValue(new Error('Network timeout'))
+});
+
+// ❌ Bad
+const mock1 = createMockUserApi({
+	getAllUsers: vi.fn().mockRejectedValue(new Error('Network timeout'))
+});
+```
+
+##### 3. Test Edge Cases
+
+```typescript
+it('should handle empty user list', async () => {
+	const mockApi = createMockUserApi({
+		getAllUsers: vi.fn().mockResolvedValue([])
+	});
+
+	const users = await mockApi.getAllUsers();
+	expect(users).toEqual([]);
+});
+
+it('should handle user not found', async () => {
+	const mockApi = createMockUserApi({
+		getUserById: vi.fn().mockRejectedValue(new Error('User with ID 999 not found'))
+	});
+
+	await expect(mockApi.getUserById(999)).rejects.toThrow('User with ID 999 not found');
+});
+```
+
+##### 4. Verify Mock Interactions
+
+```typescript
+it('should call API with correct parameters', async () => {
+	const createUserMock = vi.fn().mockResolvedValue({
+		id: 1,
+		name: 'Test',
+		email: 'test@example.com'
+	});
+
+	const mockApi = createMockUserApi({
+		createUser: createUserMock
+	});
+
+	const userData = { name: 'Test', email: 'test@example.com' };
+	await mockApi.createUser(userData);
+
+	expect(createUserMock).toHaveBeenCalledWith(userData);
+	expect(createUserMock).toHaveBeenCalledTimes(1);
+});
+```
+
+##### 5. Test Async Behavior
+
+```typescript
+it('should handle delayed responses', async () => {
+	const mockApi = createMockUserApi({
+		getAllUsers: vi
+			.fn()
+			.mockImplementation(
+				() =>
+					new Promise((resolve) =>
+						setTimeout(
+							() => resolve([{ id: 1, name: 'Delayed User', email: 'delayed@example.com' }]),
+							100
+						)
+					)
+			)
+	});
+
+	const startTime = Date.now();
+	const users = await mockApi.getAllUsers();
+	const endTime = Date.now();
+
+	expect(endTime - startTime).toBeGreaterThanOrEqual(100);
+	expect(users).toHaveLength(1);
+});
+```
+
+#### Common Testing Patterns
+
+##### Pattern 1: Arrange-Act-Assert (AAA)
+
+```typescript
+it('should follow AAA pattern', async () => {
+	// Arrange
+	const mockApi = createMockUserApi();
+	const userData = { name: 'AAA User', email: 'aaa@example.com' };
+
+	// Act
+	const result = await mockApi.createUser(userData);
+
+	// Assert
+	expect(result).toMatchObject(userData);
+	expect(result.id).toBeDefined();
+});
+```
+
+##### Pattern 2: Setup-Exercise-Verify (SEV)
+
+```typescript
+it('should follow SEV pattern', async () => {
+	// Setup
+	const deleteMock = vi.fn().mockResolvedValue(undefined);
+	const mockApi = createMockUserApi({ deleteUser: deleteMock });
+
+	// Exercise
+	await mockApi.deleteUser(1);
+	await mockApi.deleteUser(2);
+
+	// Verify
+	expect(deleteMock).toHaveBeenCalledTimes(2);
+	expect(deleteMock).toHaveBeenNthCalledWith(1, 1);
+	expect(deleteMock).toHaveBeenNthCalledWith(2, 2);
+});
+```
+
+##### Pattern 3: Given-When-Then (GWT)
+
+```typescript
+it('should delete user successfully', async () => {
+	// Given a mock API service
+	const mockApi = createMockUserApi();
+
+	// And a user exists
+	const user = await mockApi.createUser({
+		name: 'To Delete',
+		email: 'delete@example.com'
+	});
+
+	// When I delete the user
+	await mockApi.deleteUser(user.id);
+
+	// Then the user should not exist
+	await expect(mockApi.getUserById(user.id)).rejects.toThrow('not found');
+});
+```
+
 ### Best Practices
 
 #### 1. Interface Design
@@ -956,6 +1334,594 @@ export const getService = <T>(c: Context, serviceType: symbol): T => {
 	}
 };
 ```
+
+---
+
+## 🎨 Client-Side Dependency Injection (Svelte Components)
+
+In addition to server-side DI, this project implements a comprehensive client-side dependency injection system for Svelte components using InversifyJS.
+
+### Why Client-Side DI?
+
+- **Testability** - Easily mock API services for component testing
+- **Reusability** - Share services across multiple components
+- **Maintainability** - Centralized API logic and configuration
+- **Type Safety** - Full TypeScript support with IntelliSense
+- **Separation of Concerns** - Components don't know about HTTP implementation details
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────┐
+│      Svelte Components (Browser)        │
+│   Use hooks: useUserApi(), useApi()     │
+└──────────────────┬──────────────────────┘
+                   │ resolves from
+                   ↓
+┌─────────────────────────────────────────┐
+│      Client-Side DI Container           │
+│   (API services, HTTP client)           │
+└──────────────────┬──────────────────────┘
+                   │ uses
+                   ↓
+┌─────────────────────────────────────────┐
+│          HTTP Client Service            │
+│     (Fetch API wrapper)                 │
+└──────────────────┬──────────────────────┘
+                   │ calls
+                   ↓
+┌─────────────────────────────────────────┐
+│         Hono API Endpoints              │
+└─────────────────────────────────────────┘
+```
+
+### Quick Start
+
+#### 1. Using Services in Components
+
+The easiest way is to use the pre-built service hooks:
+
+```svelte
+<script lang="ts">
+	import { useUserApi } from '$lib/di/context.svelte';
+	import { onMount } from 'svelte';
+
+	// Inject the User API service
+	const userApi = useUserApi();
+
+	let users = $state([]);
+
+	onMount(async () => {
+		users = await userApi.getAllUsers();
+	});
+
+	const createUser = async (name: string, email: string) => {
+		const newUser = await userApi.createUser({ name, email });
+		users = [...users, newUser];
+	};
+</script>
+
+<h1>Users: {users.length}</h1>
+{#each users as user}
+	<div>{user.name} - {user.email}</div>
+{/each}
+```
+
+#### 2. Available Service Hooks
+
+```typescript
+import {
+	useUserApi, // User CRUD operations
+	useHealthApi, // Health check
+	useHelloApi, // Hello endpoint
+	useApi // All services combined (Facade)
+} from '$lib/di/context.svelte';
+```
+
+#### 3. Using the Combined API Service
+
+If your component needs multiple services, use the facade:
+
+```svelte
+<script lang="ts">
+	import { useApi } from '$lib/di/context.svelte';
+
+	const api = useApi();
+
+	// Access all services through one object
+	const users = await api.users.getAllUsers();
+	const health = await api.health.checkHealth();
+	const hello = await api.hello.getHello();
+</script>
+```
+
+### Client-Side Service Layer
+
+#### HTTP Client Service
+
+The HTTP client wraps the Fetch API with:
+
+- Automatic base URL configuration
+- JSON serialization/deserialization
+- Error handling with `HttpError` class
+- Request/response interceptors
+
+```typescript
+// src/services/client/http-client.service.ts
+@injectable()
+export class HttpClient implements IHttpClient {
+	async get<T>(url: string, config?: RequestConfig): Promise<T> {
+		return this.request<T>('GET', url, undefined, config);
+	}
+
+	async post<T>(url: string, data?: unknown, config?: RequestConfig): Promise<T> {
+		return this.request<T>('POST', url, data, config);
+	}
+
+	// ... other methods
+}
+```
+
+#### API Services
+
+**User API Service:**
+
+```typescript
+@injectable()
+export class UserApiService implements IUserApiService {
+	constructor(@inject(TYPES.HttpClient) private readonly httpClient: IHttpClient) {}
+
+	async getAllUsers(): Promise<User[]> {
+		const response = await this.httpClient.get<ApiResponse<User[]>>('/api/users');
+		return response.data || [];
+	}
+
+	async createUser(userData: { name: string; email: string }): Promise<User> {
+		const response = await this.httpClient.post<ApiResponse<User>>('/api/users', userData);
+		if (!response.data) throw new Error('Failed to create user');
+		return response.data;
+	}
+}
+```
+
+### Usage Patterns
+
+#### Pattern 1: Individual Service Hooks
+
+Best for components that need one specific service:
+
+```svelte
+<script lang="ts">
+	import { useUserApi } from '$lib/di/context.svelte';
+
+	const userApi = useUserApi();
+
+	const loadUsers = async () => {
+		return await userApi.getAllUsers();
+	};
+</script>
+```
+
+#### Pattern 2: Combined API Service (Facade)
+
+Best for components that need multiple API services:
+
+```svelte
+<script lang="ts">
+	import { useApi } from '$lib/di/context.svelte';
+
+	const api = useApi();
+
+	const loadData = async () => {
+		const users = await api.users.getAllUsers();
+		const health = await api.health.checkHealth();
+		const hello = await api.hello.getHello();
+	};
+</script>
+```
+
+#### Pattern 3: Component-Level DI
+
+Best for self-contained reusable components:
+
+```svelte
+<!-- UserList.svelte -->
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { useUserApi } from '$lib/di/context.svelte';
+
+	const userApi = useUserApi();
+	let users = $state([]);
+
+	onMount(async () => {
+		users = await userApi.getAllUsers();
+	});
+
+	const deleteUser = async (id: number) => {
+		await userApi.deleteUser(id);
+		users = users.filter((u) => u.id !== id);
+	};
+</script>
+
+<!-- Component renders its own data -->
+```
+
+### API Methods Reference
+
+#### User API Service
+
+```typescript
+const userApi = useUserApi();
+
+// Get all users
+const users = await userApi.getAllUsers();
+// Returns: User[]
+
+// Get single user
+const user = await userApi.getUserById(1);
+// Returns: User
+
+// Create user
+const newUser = await userApi.createUser({
+	name: 'John Doe',
+	email: 'john@example.com'
+});
+// Returns: User
+
+// Update user
+const updated = await userApi.updateUser(1, { name: 'Jane Doe' });
+// Returns: User
+
+// Delete user
+await userApi.deleteUser(1);
+// Returns: void
+```
+
+#### Health API Service
+
+```typescript
+const healthApi = useHealthApi();
+
+const status = await healthApi.checkHealth();
+// Returns: { status: string, environment: string, timestamp: string }
+```
+
+#### Hello API Service
+
+```typescript
+const helloApi = useHelloApi();
+
+const response = await helloApi.getHello();
+// Returns: { message: string, timestamp?: string, environment?: string }
+```
+
+### Error Handling
+
+Always wrap service calls in try-catch:
+
+```svelte
+<script lang="ts">
+	import { useUserApi } from '$lib/di/context.svelte';
+
+	const userApi = useUserApi();
+	let error = $state<string | null>(null);
+
+	const loadUsers = async () => {
+		error = null;
+		try {
+			return await userApi.getAllUsers();
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Unknown error';
+			console.error('Failed to load users:', err);
+			return [];
+		}
+	};
+</script>
+
+{#if error}
+	<div class="error">{error}</div>
+{/if}
+```
+
+### Testing Components with Client-Side DI
+
+#### Setting Up Test Container
+
+```typescript
+// tests/components/UserList.test.ts
+import { render, screen, waitFor } from '@testing-library/svelte';
+import { Container } from 'inversify';
+import { TYPES } from '$container/types';
+import TestWrapper from '$tests/helpers/TestWrapper.svelte';
+import { createMockUserApi } from '$tests/mocks/api.mock';
+import UserList from '$ui/components/UserList.svelte';
+
+describe('UserList Component', () => {
+	it('should load and display users', async () => {
+		// Create test container
+		const testContainer = new Container();
+
+		// Create mock service
+		const mockUserApi = createMockUserApi({
+			getAllUsers: vi
+				.fn()
+				.mockResolvedValue([{ id: 1, name: 'Test User', email: 'test@example.com' }])
+		});
+
+		// Bind mock to container
+		testContainer.bind(TYPES.UserApiService).toConstantValue(mockUserApi);
+
+		// Render with test container
+		render(TestWrapper, {
+			props: {
+				container: testContainer,
+				component: UserList
+			}
+		});
+
+		// Assert
+		await waitFor(() => {
+			expect(screen.getByText('Test User')).toBeInTheDocument();
+		});
+	});
+});
+```
+
+#### Mock Service Factory
+
+```typescript
+// tests/mocks/api.mock.ts
+export class MockUserApiService implements IUserApiService {
+	private users: User[] = [
+		{ id: 1, name: 'John Doe', email: 'john@example.com' },
+		{ id: 2, name: 'Jane Smith', email: 'jane@example.com' }
+	];
+
+	async getAllUsers(): Promise<User[]> {
+		return Promise.resolve([...this.users]);
+	}
+
+	async createUser(userData: { name: string; email: string }): Promise<User> {
+		const newUser: User = {
+			id: this.users.length + 1,
+			...userData
+		};
+		this.users.push(newUser);
+		return Promise.resolve(newUser);
+	}
+
+	// ... other methods
+}
+
+export function createMockUserApi(overrides?: Partial<IUserApiService>): IUserApiService {
+	const mock = new MockUserApiService();
+	if (!overrides) return mock;
+	return Object.assign(mock, overrides);
+}
+```
+
+### Adding New Client-Side Services
+
+#### Step 1: Define Interface
+
+```typescript
+// src/interfaces/notification.interface.ts
+export interface INotificationService {
+	success(message: string): void;
+	error(message: string): void;
+	info(message: string): void;
+}
+```
+
+#### Step 2: Implement Service
+
+```typescript
+// src/services/client/notification.service.ts
+import { injectable } from 'inversify';
+
+@injectable()
+export class NotificationService implements INotificationService {
+	success(message: string): void {
+		// Implementation (e.g., toast notification)
+	}
+
+	error(message: string): void {
+		// Implementation
+	}
+
+	info(message: string): void {
+		// Implementation
+	}
+}
+```
+
+#### Step 3: Add Type Identifier
+
+```typescript
+// src/container/types.ts
+export const TYPES = {
+	// ... existing types
+	NotificationService: Symbol.for('NotificationService')
+};
+```
+
+#### Step 4: Register in Client Container
+
+```typescript
+// src/container/client/inversify.config.client.ts
+import { NotificationService } from '../../services/client/notification.service';
+
+clientContainer
+	.bind<INotificationService>(TYPES.NotificationService)
+	.to(NotificationService)
+	.inSingletonScope();
+```
+
+#### Step 5: Create Hook
+
+```typescript
+// src/lib/di/context.svelte.ts
+export function useNotifications(): INotificationService {
+	return getService<INotificationService>(TYPES.NotificationService);
+}
+```
+
+#### Step 6: Use in Components
+
+```svelte
+<script lang="ts">
+	import { useNotifications } from '$lib/di/context.svelte';
+
+	const notifications = useNotifications();
+
+	const handleSuccess = () => {
+		notifications.success('Operation completed!');
+	};
+</script>
+```
+
+### Best Practices for Client-Side DI
+
+#### 1. Always Initialize in Root Layout
+
+```svelte
+<!-- src/routes/+layout.svelte -->
+<script lang="ts">
+	import { initializeDI } from '$lib/di/context.svelte';
+
+	// Initialize once at the root
+	initializeDI();
+</script>
+```
+
+❌ **Don't** initialize in child components
+
+#### 2. Use Appropriate Service Granularity
+
+✅ **Good** - Use specific service for focused components:
+
+```typescript
+const userApi = useUserApi();
+```
+
+✅ **Good** - Use facade for components needing multiple services:
+
+```typescript
+const api = useApi();
+```
+
+❌ **Bad** - Don't inject unused services:
+
+```typescript
+const api = useApi(); // Then only use api.users
+```
+
+#### 3. Handle Errors Gracefully
+
+```svelte
+<script lang="ts">
+	const userApi = useUserApi();
+	let error = $state<string | null>(null);
+
+	const loadUsers = async () => {
+		try {
+			return await userApi.getAllUsers();
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Unknown error';
+			console.error('Failed to load users:', err);
+			return [];
+		}
+	};
+</script>
+```
+
+#### 4. Keep Services Stateless
+
+Services should be stateless and reusable. Store state in components:
+
+✅ **Good** - Stateless service:
+
+```typescript
+class UserApiService {
+	async getAllUsers() {
+		/* ... */
+	}
+}
+```
+
+❌ **Bad** - Stateful service:
+
+```typescript
+class UserApiService {
+	private cachedUsers: User[] = []; // Don't do this
+	async getAllUsers() {
+		/* ... */
+	}
+}
+```
+
+#### 5. Depend on Interfaces
+
+✅ **Good** - Depend on interface:
+
+```typescript
+import type { IUserApiService } from '$interfaces/api.interface';
+const userApi = useUserApi(); // Returns IUserApiService
+```
+
+❌ **Bad** - Depend on implementation:
+
+```typescript
+import { UserApiService } from '$services/client/api.service';
+const userApi = new UserApiService(); // Don't do this
+```
+
+### Live Examples
+
+Visit `/di-example` route to see all patterns in action:
+
+```
+http://localhost:5173/di-example
+```
+
+The example page includes:
+
+- Pattern 1: Individual service hooks
+- Pattern 2: Combined API service (Facade)
+- Pattern 3: Component-level DI
+- Benefits overview
+- Code examples
+
+### Troubleshooting Client-Side DI
+
+#### "DI Container not found in context"
+
+**Cause**: DI not initialized or accessing before initialization
+
+**Solution**: Ensure `initializeDI()` is called in root layout (`+layout.svelte`)
+
+#### "No matching bindings found"
+
+**Cause**: Service not registered in client container
+
+**Solution**: Add binding to `src/container/client/inversify.config.client.ts`
+
+#### Type errors with services
+
+**Cause**: Interface mismatch or missing interface
+
+**Solution**: Ensure service implementation matches interface exactly
+
+### Key Differences: Server vs Client DI
+
+| Aspect             | Server-Side DI                      | Client-Side DI                                    |
+| ------------------ | ----------------------------------- | ------------------------------------------------- |
+| **Location**       | `src/container/inversify.config.ts` | `src/container/client/inversify.config.client.ts` |
+| **Usage**          | Hono API routes                     | Svelte components                                 |
+| **Services**       | Business logic, repositories        | HTTP client, API services                         |
+| **Initialization** | Per request (Hono middleware)       | Once at app root (`+layout.svelte`)               |
+| **Resolution**     | `getService(c, TYPES.Service)`      | `useService()` hooks                              |
+| **Environment**    | Edge/Node.js                        | Browser                                           |
 
 ## 📦 Building and Deployment
 

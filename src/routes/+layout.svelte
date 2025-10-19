@@ -1,7 +1,11 @@
 <script lang="ts">
 	import '../app.css';
+	import { initializeDI } from '$lib/di/context.svelte';
 
 	let { children } = $props();
+
+	// Initialize dependency injection container
+	initializeDI();
 </script>
 
 <div class="flex flex-col items-center justify-center space-y-4 px-4 md:px-6">

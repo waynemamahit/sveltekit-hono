@@ -1,17 +1,17 @@
-import 'reflect-metadata';
 import { Container } from 'inversify';
+import 'reflect-metadata';
 import { TYPES } from './types';
 
 // Interfaces
-import type { IUserService, IUserRepository } from '../interfaces/user.interface';
-import type { ILogger, ILoggerFactory } from '../interfaces/logger.interface';
 import type { IConfigService } from '../interfaces/config.interface';
+import type { ILogger, ILoggerFactory } from '../interfaces/logger.interface';
+import type { IUserRepository, IUserService } from '../interfaces/user.interface';
 
 // Implementations
-import { UserService } from '../services/user.service';
-import { UserRepository } from '../services/user.repository';
-import { Logger, LoggerFactory } from '../services/logger.service';
 import { ConfigService } from '../services/config.service';
+import { Logger, LoggerFactory } from '../services/logger.service';
+import { UserRepository } from '../services/user.repository';
+import { UserService } from '../services/user.service';
 
 // Extend Hono's context to include DI container
 declare module 'hono' {

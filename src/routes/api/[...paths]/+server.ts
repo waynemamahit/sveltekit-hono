@@ -5,7 +5,7 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import 'reflect-metadata';
-import { container } from '../../../container/inversify.config';
+import { container } from '../../../container/inversify.server';
 import { getLogger, getUserService } from '../../../container/resolvers';
 import {
 	BadRequestError,

@@ -1,13 +1,18 @@
 <script lang="ts">
-	import { PUBLIC_ENV } from '../lib/env';
+	import { resolve } from '$app/paths';
+	import { useApi } from '$lib/di/context.svelte';
 	import { onMount } from 'svelte';
+	import type { HelloResponse } from '../interfaces/api.interface';
 	import type { User } from '../models/user.model';
 	import type { HealthStatus } from '../types/health';
 	import UserCard from '../ui/components/UserCard.svelte';
 	import UserForm from '../ui/components/UserForm.svelte';
 
+	// Inject API services using DI
+	const api = useApi();
+
 	let message = $state('');
-	let response = $state({});
+	let response = $state<HelloResponse>({} as HelloResponse);
 	let users = $state<User[]>([]);
 	let healthStatus = $state<HealthStatus | null>(null);
 	let isLoading = $state(false);
@@ -22,8 +27,7 @@
 
 	const fetchHello = async () => {
 		try {
-			const res = await fetch(`${PUBLIC_ENV.API_BASE_URL}/hello`);
-			const json = await res.json();
+			const json = await api.hello.getHello();
 			response = json;
 			message = json.message;
 		} catch (error) {
@@ -33,8 +37,7 @@
 
 	const fetchHealth = async () => {
 		try {
-			const res = await fetch(`${PUBLIC_ENV.API_BASE_URL}/health`);
-			healthStatus = await res.json();
+			healthStatus = await api.health.checkHealth();
 		} catch (error) {
 			console.error('Error fetching health:', error);
 		}
@@ -42,9 +45,7 @@
 
 	const fetchUsers = async () => {
 		try {
-			const res = await fetch(`${PUBLIC_ENV.API_BASE_URL}/users`);
-			const json = await res.json();
-			users = json.data || [];
+			users = await api.users.getAllUsers();
 		} catch (error) {
 			console.error('Error fetching users:', error);
 		}
@@ -53,18 +54,8 @@
 	const createUser = async (userData: { name: string; email: string }) => {
 		isLoading = true;
 		try {
-			const res = await fetch(`${PUBLIC_ENV.API_BASE_URL}/users`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(userData)
-			});
-			const json = await res.json();
-
-			if (res.ok) {
-				users = [...users, json.data];
-			}
+			const newUser = await api.users.createUser(userData);
+			users = [...users, newUser];
 		} catch (error) {
 			console.error('Error creating user:', error);
 			throw error; // Re-throw so UserForm can handle the error
@@ -75,13 +66,8 @@
 
 	const deleteUser = async (id: number) => {
 		try {
-			const res = await fetch(`${PUBLIC_ENV.API_BASE_URL}/users/${id}`, {
-				method: 'DELETE'
-			});
-
-			if (res.ok) {
-				users = users.filter((user) => user.id !== id);
-			}
+			await api.users.deleteUser(id);
+			users = users.filter((user) => user.id !== id);
 		} catch (error) {
 			console.error('Error deleting user:', error);
 		}
@@ -158,22 +144,34 @@
 			<!-- API Links -->
 			<div class="flex flex-wrap gap-4">
 				<a
-					href="/api/health"
+					href={resolve('/di-example')}
+					class="rounded-md bg-orange-600 px-4 py-2 text-white transition-colors hover:bg-orange-700"
+				>
+					🔌 DI Examples
+				</a>
+				<a
+					href={resolve('/api/health')}
 					target="_blank"
+					rel="noopener noreferrer"
+					data-sveltekit-reload
 					class="rounded-md bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
 				>
 					Health Check
 				</a>
 				<a
-					href="/api/hello"
+					href={resolve('/api/hello')}
 					target="_blank"
+					rel="noopener noreferrer"
+					data-sveltekit-reload
 					class="rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
 				>
 					Hello API
 				</a>
 				<a
-					href="/api/users"
+					href={resolve('/api/users')}
 					target="_blank"
+					rel="noopener noreferrer"
+					data-sveltekit-reload
 					class="rounded-md bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700"
 				>
 					Users API
