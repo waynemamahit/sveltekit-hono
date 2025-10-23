@@ -28,7 +28,7 @@ A modern, production-ready full-stack template combining **SvelteKit**, **Hono**
 
 ### 🧪 **Developer Experience**
 
-- **Comprehensive Testing** with Vitest (API + Component tests)
+- **Comprehensive Testing** with Vitest (Unit/Component) + Playwright (E2E)
 - **Hot Reload** development with TypeScript, ESLint, Prettier
 - **Health Checks** and structured logging
 - **Environment Management** for all deployment stages
@@ -39,7 +39,7 @@ A modern, production-ready full-stack template combining **SvelteKit**, **Hono**
 - **Backend**: [Hono](https://hono.dev/) API framework
 - **Dependency Injection**: [InversifyJS](https://inversify.io/) IoC container
 - **Styling**: [TailwindCSS](https://tailwindcss.com/)
-- **Testing**: [Vitest](https://vitest.dev/) + [Testing Library](https://testing-library.com/)
+- **Testing**: [Vitest](https://vitest.dev/) + [Testing Library](https://testing-library.com/) + [Playwright](https://playwright.dev/)
 - **Platform**: [Cloudflare Workers](https://workers.cloudflare.com/) + [Pages](https://pages.cloudflare.com/)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
 - **Package Manager**: [pnpm](https://pnpm.io/)
@@ -190,14 +190,50 @@ pnpm preview       # Preview built app
 ### Quality & Testing
 
 ```bash
+# Unit & Component Tests (Vitest)
 pnpm test          # Tests in watch mode
 pnpm test:run      # Run all tests once
 pnpm test:ui       # Interactive test UI
 pnpm test:coverage # Coverage reports
+
+# E2E Tests (Playwright)
+pnpm test:e2e          # Run E2E tests
+pnpm test:e2e:ui       # Interactive E2E test UI
+pnpm test:e2e:headed   # Run with visible browser
+pnpm test:e2e:debug    # Debug E2E tests
+
+# Code Quality
 pnpm check         # TypeScript validation
 pnpm lint          # Code linting
 pnpm format        # Code formatting
 ```
+
+</text>
+
+<old_text line=292>
+
+## 🧪 Testing
+
+Comprehensive test suite with **Vitest** + **Testing Library**:
+
+> 📘 **For complete testing guide, see [TESTING.md](./TESTING.md)**
+>
+> Includes: testing strategies, patterns, DI testing, mocking, coverage, and CI/CD setup
+
+```bash
+# Run tests
+pnpm test:run          # All tests once
+pnpm test             # Watch mode
+pnpm test:ui          # Interactive UI
+pnpm test:coverage    # With coverage
+```
+
+### What's Tested
+
+- **API Endpoints** - Request/response validation, error handling
+- **Svelte Components** - User interactions, form validation
+- **Services** - Business logic with dependency injection
+- **Error Scenarios** - Custom error classes and status codes
 
 ### Deployment
 
@@ -267,26 +303,49 @@ curl -X POST http://localhost:5173/api/users \
 
 ## 🧪 Testing
 
-Comprehensive test suite with **Vitest** + **Testing Library**:
+Comprehensive test suite with **Vitest** (unit/component) + **Playwright** (E2E):
 
-> 📘 **For complete testing guide, see [TESTING.md](./TESTING.md)**
+> 📘 **For complete testing guides:**
 >
-> Includes: testing strategies, patterns, DI testing, mocking, coverage, and CI/CD setup
+> - [TESTING.md](./TESTING.md) - Unit & component testing with Vitest
+> - [E2E_TESTING.md](./docs/E2E_TESTING.md) - End-to-end testing with Playwright
+
+### Unit & Component Tests (Vitest)
 
 ```bash
-# Run tests
-pnpm test:run          # All tests once
-pnpm test             # Watch mode
-pnpm test:ui          # Interactive UI
-pnpm test:coverage    # With coverage
+pnpm test              # Watch mode
+pnpm test:run          # Run once
+pnpm test:ui           # Interactive UI
+pnpm test:coverage     # With coverage
+```
+
+### E2E Tests (Playwright)
+
+```bash
+pnpm test:e2e          # Run E2E tests (headless)
+pnpm test:e2e:ui       # Interactive UI mode (recommended)
+pnpm test:e2e:headed   # Run with visible browser
+pnpm test:e2e:debug    # Debug with DevTools
+pnpm test:e2e:chromium # Test in Chrome only
+pnpm test:e2e:firefox  # Test in Firefox only
+pnpm test:e2e:webkit   # Test in Safari only
 ```
 
 ### What's Tested
+
+**Unit & Component Tests:**
 
 - **API Endpoints** - Request/response validation, error handling
 - **Svelte Components** - User interactions, form validation
 - **Services** - Business logic with dependency injection
 - **Error Scenarios** - Custom error classes and status codes
+
+**E2E Tests (117 tests across 3 browsers):**
+
+- **Homepage** - UI rendering, API integration, page structure
+- **User Management** - CRUD operations, form validation, state management
+- **API Endpoints** - RESTful API testing, error responses, data validation
+- **Navigation** - Routing, browser history, link behavior, multi-tab scenarios
 
 ## ✅ Validation with Zod v4
 
@@ -410,7 +469,8 @@ Ensure all tests pass and follow the existing code patterns.
 ### Project Docs
 
 - **[DEVELOPMENT.md](./docs/DEVELOPMENT.md)** - Comprehensive development guide
-- **[TESTING.md](./TESTING.md)** - Complete testing guide and best practices
+- **[TESTING.md](./TESTING.md)** - Unit & component testing guide
+- **[E2E_TESTING.md](./docs/E2E_TESTING.md)** - End-to-end testing with Playwright
 
 ### Tech Stack Docs
 
@@ -418,7 +478,8 @@ Ensure all tests pass and follow the existing code patterns.
 - [Hono](https://hono.dev/) - API framework
 - [Cloudflare Workers](https://developers.cloudflare.com/workers/) - Deployment platform
 - [InversifyJS](https://inversify.io/) - Dependency injection
-- [Vitest](https://vitest.dev/) - Testing framework
+- [Vitest](https://vitest.dev/) - Unit/component testing
+- [Playwright](https://playwright.dev/) - E2E testing
 
 ## 🐛 Troubleshooting
 

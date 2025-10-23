@@ -35,5 +35,16 @@ export default ts.config(
 				svelteConfig
 			}
 		}
+	},
+	{
+		files: ['tests/e2e/**/*.ts', 'tests/e2e/**/*.spec.ts'],
+		languageOptions: {
+			globals: {
+				...globals.node
+			}
+		},
+		rules: {
+			'@typescript-eslint/no-unused-expressions': 'off'
+		}
 	}
 );
